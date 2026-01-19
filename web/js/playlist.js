@@ -200,9 +200,10 @@ const Playlist = {
         // Show full filename (video.file) in tooltip, display clean title
         const tooltipText = video.file || video.title;
 
+        // Use encodeURIComponent for data attribute to preserve special chars
         return `
             <div class="video-item ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}"
-                 data-video-path="${this.escapeHtml(video.path)}"
+                 data-video-path="${encodeURIComponent(video.path)}"
                  title="${this.escapeHtml(tooltipText)}">
                 <span class="video-status">${statusIcon}</span>
                 <div class="video-info">
@@ -228,7 +229,7 @@ const Playlist = {
         // Video items
         this.container.querySelectorAll('.video-item').forEach(item => {
             item.addEventListener('click', () => {
-                const videoPath = item.dataset.videoPath;
+                const videoPath = decodeURIComponent(item.dataset.videoPath);
                 const video = this.allVideos.find(v => v.path === videoPath);
                 if (video) {
                     App.playVideo(video);
@@ -295,7 +296,8 @@ const Playlist = {
 
         // Add new active
         if (video) {
-            const item = this.container.querySelector(`[data-video-path="${video.path}"]`);
+            const encodedPath = encodeURIComponent(video.path);
+            const item = this.container.querySelector(`[data-video-path="${encodedPath}"]`);
             if (item) {
                 item.classList.add('active');
                 // Scroll into view
@@ -309,7 +311,8 @@ const Playlist = {
      * @param {string} videoPath - Video path
      */
     markVideoCompleted(videoPath) {
-        const item = this.container.querySelector(`[data-video-path="${videoPath}"]`);
+        const encodedPath = encodeURIComponent(videoPath);
+        const item = this.container.querySelector(`[data-video-path="${encodedPath}"]`);
         if (item) {
             item.classList.add('completed');
             item.querySelector('.video-status').textContent = '✓';
@@ -520,7 +523,7 @@ const Playlist = {
 
             html += `
                 <div class="video-item ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}"
-                     data-video-path="${this.escapeHtml(video.path)}"
+                     data-video-path="${encodeURIComponent(video.path)}"
                      title="${this.escapeHtml(video.file || video.title)}">
                     <span class="video-status">${statusIcon}</span>
                     <div class="video-info">
