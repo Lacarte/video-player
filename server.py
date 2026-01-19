@@ -38,6 +38,10 @@ mimetypes.add_type('application/x-subrip', '.srt')
 class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     """HTTP handler with Range request support for video seeking."""
 
+    # Larger buffer for faster streaming (1MB instead of default 8KB)
+    rbufsize = 1024 * 1024
+    wbufsize = 1024 * 1024
+
     def send_head(self):
         if 'Range' not in self.headers:
             self.range = None
@@ -87,6 +91,8 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Content-Length", str(end - start + 1))
         self.send_header("Last-Modified", self.date_time_string(fs.st_mtime))
         self.send_header("Accept-Ranges", "bytes")
+        self.send_header("Connection", "keep-alive")
+        self.send_header("Cache-Control", "public, max-age=3600")
         self.end_headers()
 
         f.seek(start)
@@ -95,6 +101,9 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 
 class LimitedFileWrapper:
     """Wrapper to limit file reads for Range requests."""
+
+    # 256KB chunks for efficient streaming
+    CHUNK_SIZE = 256 * 1024
 
     def __init__(self, f, length):
         self.f = f
@@ -105,12 +114,10 @@ class LimitedFileWrapper:
         if self.read_so_far >= self.length:
             return b""
         if size < 0:
-            remaining = self.length - self.read_so_far
-            data = self.f.read(remaining)
-            self.read_so_far += len(data)
-            return data
+            # Read in chunks to avoid memory issues with large files
+            size = self.CHUNK_SIZE
         remaining = self.length - self.read_so_far
-        to_read = min(size, remaining)
+        to_read = min(size, remaining, self.CHUNK_SIZE)
         data = self.f.read(to_read)
         self.read_so_far += len(data)
         return data
@@ -218,7 +225,12 @@ class VideoPlayerHandler(RangeHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-Type', content_type)
             self.send_header('Content-Length', len(content))
-            self.send_header('Cache-Control', 'no-cache')
+            # Cache static files for 1 hour during development, use no-cache for HTML
+            if content_type == 'text/html':
+                self.send_header('Cache-Control', 'no-cache')
+            else:
+                self.send_header('Cache-Control', 'public, max-age=3600')
+            self.send_header('Connection', 'keep-alive')
             self.end_headers()
             self.wfile.write(content)
         except Exception as e:

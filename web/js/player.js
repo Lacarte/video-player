@@ -103,14 +103,18 @@ const Player = {
             this.subtitleGroup.style.display = 'none';
         }
 
-        // Restore progress
+        // Restore progress after metadata loads
         const savedProgress = Progress.getVideoProgress(video.path);
         if (savedProgress > 0) {
-            this.video.currentTime = savedProgress;
+            // Set currentTime after metadata is loaded for better seeking
+            const onCanPlay = () => {
+                this.video.currentTime = savedProgress;
+                this.video.removeEventListener('canplay', onCanPlay);
+            };
+            this.video.addEventListener('canplay', onCanPlay);
         }
 
-        // Start playing
-        this.video.load();
+        // Start playing (setting src already triggers load with preload="metadata")
         this.video.play().catch(e => {
             console.log('Autoplay prevented:', e);
         });
