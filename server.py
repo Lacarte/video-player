@@ -102,8 +102,8 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 class LimitedFileWrapper:
     """Wrapper to limit file reads for Range requests."""
 
-    # 512KB chunks for faster streaming
-    CHUNK_SIZE = 512 * 1024
+    # 2MB chunks for faster streaming
+    CHUNK_SIZE = 2 * 1024 * 1024
 
     def __init__(self, f, length):
         self.f = f
