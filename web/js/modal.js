@@ -1,41 +1,54 @@
 /**
  * Modal module for document viewing
- * Supports: PDF, Images, Text, JSON, ZIP (file list)
+ * Supports: PDF, HTML, Images, Text, JSON, ZIP (file list)
  */
 
 const Modal = {
     // DOM elements
     modal: null,
+    modalContent: null,
     backdrop: null,
     title: null,
     body: null,
     downloadBtn: null,
     closeBtn: null,
     closeBtnFooter: null,
+    fullscreenBtn: null,
 
     /**
      * Initialize modal module
      */
     init() {
         this.modal = document.getElementById('doc-modal');
+        this.modalContent = this.modal.querySelector('.modal-content');
         this.backdrop = document.getElementById('modal-backdrop');
         this.title = document.getElementById('modal-title');
         this.body = document.getElementById('modal-body');
         this.downloadBtn = document.getElementById('modal-download');
         this.closeBtn = document.getElementById('modal-close');
         this.closeBtnFooter = document.getElementById('modal-close-btn');
+        this.fullscreenBtn = document.getElementById('modal-fullscreen');
 
         // Event listeners
         this.backdrop.addEventListener('click', () => this.close());
         this.closeBtn.addEventListener('click', () => this.close());
         this.closeBtnFooter.addEventListener('click', () => this.close());
+        this.fullscreenBtn?.addEventListener('click', () => this.toggleFullscreen());
 
         // Escape key
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && this.modal.classList.contains('show')) {
-                this.close();
+                // If in fullscreen, exit fullscreen first
+                if (document.fullscreenElement) {
+                    document.exitFullscreen();
+                } else {
+                    this.close();
+                }
             }
         });
+
+        // Update button icon when fullscreen changes
+        document.addEventListener('fullscreenchange', () => this.updateFullscreenIcon());
     },
 
     /**
@@ -54,6 +67,9 @@ const Modal = {
         switch (doc.type) {
             case 'pdf':
                 this.loadPDF(doc.path);
+                break;
+            case 'html':
+                this.loadHTML(doc.path);
                 break;
             case 'image':
                 this.loadImage(doc.path, doc.title);
@@ -78,6 +94,10 @@ const Modal = {
      * Close modal
      */
     close() {
+        // Exit fullscreen if active
+        if (document.fullscreenElement) {
+            document.exitFullscreen();
+        }
         this.modal.classList.remove('show');
         // Clear body after transition
         setTimeout(() => {
@@ -86,11 +106,55 @@ const Modal = {
     },
 
     /**
+     * Toggle fullscreen mode for modal content
+     */
+    toggleFullscreen() {
+        if (document.fullscreenElement) {
+            document.exitFullscreen();
+        } else {
+            this.modalContent.requestFullscreen().catch(err => {
+                console.log('Fullscreen not supported:', err);
+            });
+        }
+    },
+
+    /**
+     * Update fullscreen button icon based on current state
+     */
+    updateFullscreenIcon() {
+        if (!this.fullscreenBtn) return;
+
+        const isFullscreen = !!document.fullscreenElement;
+        this.fullscreenBtn.innerHTML = isFullscreen
+            ? `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="4 14 10 14 10 20"></polyline>
+                <polyline points="20 10 14 10 14 4"></polyline>
+                <line x1="14" y1="10" x2="21" y2="3"></line>
+                <line x1="3" y1="21" x2="10" y2="14"></line>
+               </svg>`
+            : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <polyline points="9 21 3 21 3 15"></polyline>
+                <line x1="21" y1="3" x2="14" y2="10"></line>
+                <line x1="3" y1="21" x2="10" y2="14"></line>
+               </svg>`;
+        this.fullscreenBtn.title = isFullscreen ? 'Exit Fullscreen' : 'Toggle Fullscreen';
+    },
+
+    /**
      * Load PDF in iframe
      * @param {string} path - PDF path
      */
     loadPDF(path) {
         this.body.innerHTML = `<iframe src="${path}" title="PDF Viewer"></iframe>`;
+    },
+
+    /**
+     * Load HTML in iframe
+     * @param {string} path - HTML file path
+     */
+    loadHTML(path) {
+        this.body.innerHTML = `<iframe src="${path}" title="HTML Viewer"></iframe>`;
     },
 
     /**

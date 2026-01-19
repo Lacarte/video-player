@@ -414,6 +414,7 @@ const App = {
     getDocumentIcon(type) {
         const icons = {
             'pdf': '📕',
+            'html': '🌐',
             'image': '🖼️',
             'text': '📝',
             'json': '📋',

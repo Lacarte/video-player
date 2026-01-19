@@ -47,6 +47,8 @@ def get_document_type(extension: str) -> DocumentType:
         return DocumentType.JSON
     elif ext in {'.zip', '.rar', '.7z'}:
         return DocumentType.ZIP
+    elif ext in {'.html', '.htm'}:
+        return DocumentType.HTML
     else:
         return DocumentType.OTHER
 

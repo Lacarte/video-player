@@ -151,10 +151,11 @@ const Playlist = {
         const completion = this.getChapterCompletion(chapter);
         const videoCount = chapter.video_count || chapter.videos?.length || 0;
         const duration = this.formatDuration(chapter.duration);
+        const escapedId = this.escapeHtml(chapterId);
 
         let html = `
-            <div class="playlist-chapter" data-chapter-id="${chapterId}" style="margin-left: ${depth * 12}px;">
-                <div class="chapter-header ${isExpanded ? 'expanded' : ''}" data-chapter="${chapterId}" title="${this.escapeHtml(chapter.title)}">
+            <div class="playlist-chapter" data-chapter-id="${escapedId}" style="margin-left: ${depth * 12}px;">
+                <div class="chapter-header ${isExpanded ? 'expanded' : ''}" data-chapter="${escapedId}" title="${this.escapeHtml(chapter.title)}">
                     <span class="chapter-toggle ${isExpanded ? 'expanded' : ''}">▶</span>
                     <span class="chapter-title">${this.escapeHtml(chapter.title)}</span>
                     <div class="chapter-meta">
@@ -165,7 +166,7 @@ const Playlist = {
                         <div class="chapter-progress-bar" style="width: ${completion}%"></div>
                     </div>
                 </div>
-                <div class="chapter-videos ${isExpanded ? 'expanded' : ''}" data-chapter-content="${chapterId}">
+                <div class="chapter-videos ${isExpanded ? 'expanded' : ''}" data-chapter-content="${escapedId}">
         `;
 
         // Videos in this chapter
@@ -245,8 +246,9 @@ const Playlist = {
      * @param {string} chapterId - Chapter ID
      */
     toggleChapter(chapterId) {
-        const header = this.container.querySelector(`[data-chapter="${chapterId}"]`);
-        const content = this.container.querySelector(`[data-chapter-content="${chapterId}"]`);
+        const escapedId = CSS.escape(chapterId);
+        const header = this.container.querySelector(`[data-chapter="${escapedId}"]`);
+        const content = this.container.querySelector(`[data-chapter-content="${escapedId}"]`);
         const toggle = header?.querySelector('.chapter-toggle');
 
         if (!header || !content) return;
@@ -299,7 +301,7 @@ const Playlist = {
         // Add new active
         if (video) {
             const encodedPath = encodeURIComponent(video.path);
-            const item = this.container.querySelector(`[data-video-path="${encodedPath}"]`);
+            const item = this.container.querySelector(`[data-video-path="${CSS.escape(encodedPath)}"]`);
             if (item) {
                 item.classList.add('active');
                 // Scroll into view
@@ -314,7 +316,7 @@ const Playlist = {
      */
     markVideoCompleted(videoPath) {
         const encodedPath = encodeURIComponent(videoPath);
-        const item = this.container.querySelector(`[data-video-path="${encodedPath}"]`);
+        const item = this.container.querySelector(`[data-video-path="${CSS.escape(encodedPath)}"]`);
         if (item) {
             item.classList.add('completed');
             item.querySelector('.video-status').textContent = '✓';
@@ -391,10 +393,13 @@ const Playlist = {
     /**
      * Generate unique ID for a chapter
      * @param {Object} chapter - Chapter object
-     * @returns {string} - Unique ID
+     * @returns {string} - Unique ID (sanitized for use in CSS selectors)
      */
     getChapterId(chapter) {
-        return chapter.path || chapter.title;
+        const id = chapter.path || chapter.title;
+        // Replace backslashes/forward slashes and special chars that break CSS selectors
+        // Using hex escape \x5c for backslash, \x2f for forward slash
+        return id.replace(/[\x5c\x2f]/g, '_').replace(/[^\w\s-]/g, '');
     },
 
     /**
