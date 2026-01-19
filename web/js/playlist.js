@@ -118,10 +118,10 @@ const Playlist = {
 
         let html = '';
 
-        // Combine root videos and chapters into a single list sorted by order
-        const rootVideos = (this.playlist.videos || []).map(v => ({ type: 'video', item: v, order: v.order }));
-        const chapters = (this.playlist.chapters || []).map(c => ({ type: 'chapter', item: c, order: c.order }));
-        const combined = [...rootVideos, ...chapters].sort((a, b) => a.order - b.order);
+        // Combine root videos and chapters - backend already sorts correctly
+        const rootVideos = (this.playlist.videos || []).map(v => ({ type: 'video', item: v }));
+        const chapters = (this.playlist.chapters || []).map(c => ({ type: 'chapter', item: c }));
+        const combined = [...rootVideos, ...chapters];
 
         // Render items in order
         for (const entry of combined) {

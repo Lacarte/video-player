@@ -394,8 +394,17 @@ const Player = {
      */
     jumpToCurrentInPlaylist() {
         if (this.currentVideo) {
+            // Open sidebar if collapsed
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar?.classList.contains('collapsed')) {
+                App.toggleSidebar(true);
+            }
+            // Expand chapter and scroll to video
             Playlist.expandToVideo(this.currentVideo);
-            Playlist.setActiveVideo(this.currentVideo);
+            // Small delay to allow DOM update after expand
+            setTimeout(() => {
+                Playlist.setActiveVideo(this.currentVideo);
+            }, 50);
         }
     },
 

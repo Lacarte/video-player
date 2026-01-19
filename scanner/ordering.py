@@ -12,28 +12,30 @@ import re
 from typing import Tuple
 
 
-def extract_sort_key(name: str) -> Tuple[int, str]:
+def extract_sort_key(name: str) -> Tuple[str, int, str]:
     """
     Extract sorting key from a filename or folder name.
 
     Returns:
-        Tuple of (numeric_order, alphabetic_key)
+        Tuple of (prefix, numeric_order, alphabetic_key)
+        - prefix: groups items together (e.g., "A roadmap_mes" items stay together)
+        - numeric_order: sorts within the group
+        - alphabetic_key: tiebreaker
 
     Examples:
-        "1_intro.mp4"     -> (1, "intro.mp4")
-        "01 - Setup.mp4"  -> (1, "Setup.mp4")
-        "[1] Welcome"     -> (1, "Welcome")
-        "intro_1.mp4"     -> (1, "intro.mp4")
-        "lesson.mp4"      -> (999999, "lesson.mp4")
-        "1a.mp4"          -> (1, "a.mp4")
-        "a1.mp4"          -> (1, "a.mp4")
+        "1_intro.mp4"     -> ("", 1, "intro.mp4")
+        "01 - Setup.mp4"  -> ("", 1, "setup.mp4")
+        "[1] Welcome"     -> ("", 1, "welcome")
+        "intro_1.mp4"     -> ("intro", 1, "")
+        "lesson.mp4"      -> ("~~~", 999999, "lesson.mp4")
+        "Módulo 1"        -> ("módulo", 1, "")
     """
     # Remove extension for analysis (but keep for sorting)
     base_name = name
 
     # Names starting with "-" go to the bottom (order 999998, before items with no number)
     if base_name.startswith('-'):
-        return (999998, base_name.lower())
+        return ('~~', 999998, base_name.lower())
 
     # Pattern 1: Number at START
     # Matches: "1_", "01 ", "1.", "1-", "[1]", "(1)", "1a", or just "1" etc.
@@ -50,7 +52,10 @@ def extract_sort_key(name: str) -> Tuple[int, str]:
         if match:
             num = int(match.group(1))
             rest = match.group(2).strip() or base_name
-            return (num, rest.lower())
+            # Use prefix that sorts after end-pattern items (like "a roadmap") but before
+            # word-number items starting with later letters (like "módulo")
+            # 'l' chosen because: a < l < m
+            return ('l__numbered', num, rest.lower())
 
     # Pattern 2: "Word Number" format (Módulo 1, Chapter 10, etc.)
     # Must have a word followed by space and number
@@ -60,8 +65,8 @@ def extract_sort_key(name: str) -> Tuple[int, str]:
         prefix = match.group(1).strip()
         num = int(match.group(2))
         suffix = match.group(3).strip()
-        # Return with prefix for secondary sorting (so "Módulo 1" and "Chapter 1" sort separately)
-        return (num, prefix.lower() + ' ' + suffix.lower())
+        # Prefix groups items together, then sort by number within prefix
+        return (prefix.lower(), num, suffix.lower())
 
     # Pattern 3: Number at END with separator (requires: "_1", "-1", ".1")
     # Does NOT match: "lesson.mp4" (4 is part of extension)
@@ -72,10 +77,11 @@ def extract_sort_key(name: str) -> Tuple[int, str]:
         rest = match.group(1).strip()
         num = int(match.group(2))
         ext = match.group(3) or ''
-        return (num, (rest + ext).lower())
+        # Prefix groups items together, then sort by number within prefix
+        return (rest.lower(), num, ext.lower())
 
-    # Pattern 3: No number found
-    return (999999, base_name.lower())
+    # No number found - push to bottom
+    return ('~~~', 999999, base_name.lower())
 
 
 def sort_items(items: list, key_func=None, ctime_func=None) -> list:
@@ -97,10 +103,9 @@ def sort_items(items: list, key_func=None, ctime_func=None) -> list:
 
     def sort_key(item):
         name = key_func(item)
-        num, alpha = extract_sort_key(name)
-        # Items starting with "-" get num=999998 and sort alphabetically (via alpha)
-        # All other items sort by num first, then alphabetically
-        return (num, alpha)
+        prefix, num, alpha = extract_sort_key(name)
+        # Sort by: prefix (groups items), then number, then alphabetically
+        return (prefix, num, alpha)
 
     return sorted(items, key=sort_key)
 
@@ -158,6 +163,14 @@ if __name__ == "__main__":
         "2_basics.mp4",
         "no_number_here.txt",
         "finale_99.mp4",
+        # Test case for roadmap ordering
+        "A roadmap_mes_1",
+        "1 Empieza aquí",
+        "Módulo 1 - Fundamentos",
+        "A roadmap_mes_2",
+        "A roadmap_mes_3",
+        "Módulo 3 - Instalación",
+        "Módulo 4 - Nodos",
     ]
 
     print("Sort Key Extraction:")
@@ -165,7 +178,7 @@ if __name__ == "__main__":
     for name in test_cases:
         key = extract_sort_key(name)
         title = get_clean_title(name)
-        print(f"  {name:30} -> {str(key):20} | {title}")
+        print(f"  {name:30} -> {str(key):30} | {title}")
 
     print("\nSorted Order:")
     print("-" * 50)

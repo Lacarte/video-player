@@ -313,7 +313,7 @@ def scan_folder(
             # The video already has its subtitles linked
             # Use the folder's sort key for ordering so "0. Intro" folder sorts before "1. Basics"
             # Also use the folder name as the video title (preserving numbering like "0. Introducción")
-            folder_sort_num, _ = extract_sort_key(folder.name)
+            _, folder_sort_num, _ = extract_sort_key(folder.name)
             for vid in sub_videos:
                 vid.order = folder_sort_num
                 vid.title = folder.name  # Use folder name as title to preserve numbering
@@ -324,7 +324,7 @@ def scan_folder(
             # Normal chapter with videos
             # Use full folder name to preserve numbering (e.g., "1. Generación de la Idea")
             # Extract order from folder name for proper sorting
-            folder_sort_num, _ = extract_sort_key(folder.name)
+            _, folder_sort_num, _ = extract_sort_key(folder.name)
             chapter = Chapter(
                 title=folder.name,
                 order=folder_sort_num,
@@ -337,7 +337,7 @@ def scan_folder(
         elif sub_docs or sub_sub_chapters:
             # Folder has documents but no videos - still show as chapter
             # Extract order from folder name for proper sorting
-            folder_sort_num, _ = extract_sort_key(folder.name)
+            _, folder_sort_num, _ = extract_sort_key(folder.name)
             chapter = Chapter(
                 title=folder.name,
                 order=folder_sort_num,
@@ -349,9 +349,9 @@ def scan_folder(
             sub_chapters.append(chapter)
 
     # Sort videos by order (important when videos are promoted from wrapper folders)
-    videos.sort(key=lambda v: (v.order, v.title.lower()))
-    # Sort chapters by order (extracted from folder name)
-    sub_chapters.sort(key=lambda c: (c.order, c.title.lower()))
+    videos = sort_items(videos, key_func=lambda v: v.title)
+    # Sort chapters using full sort key (prefix + number) to keep groups together
+    sub_chapters = sort_items(sub_chapters, key_func=lambda c: c.title)
     return videos, documents, sub_chapters
 
 
