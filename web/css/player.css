@@ -605,6 +605,12 @@ body {
     cursor: not-allowed;
 }
 
+.btn-control-small {
+    padding: 6px;
+    background: transparent;
+    border: none;
+}
+
 .now-playing {
     display: flex;
     align-items: center;

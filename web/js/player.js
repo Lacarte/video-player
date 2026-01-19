@@ -15,6 +15,7 @@ const Player = {
     autoplayToggle: null,
     btnPrev: null,
     btnNext: null,
+    btnJumpTo: null,
 
     // State
     currentVideo: null,
@@ -35,6 +36,7 @@ const Player = {
         this.autoplayToggle = document.getElementById('autoplay-toggle');
         this.btnPrev = document.getElementById('btn-prev');
         this.btnNext = document.getElementById('btn-next');
+        this.btnJumpTo = document.getElementById('btn-jump-to');
 
         this.attachEventListeners();
         this.loadPreferences();
@@ -58,6 +60,7 @@ const Player = {
         this.autoplayToggle.addEventListener('change', () => this.onAutoplayChange());
         this.btnPrev.addEventListener('click', () => this.playPrevious());
         this.btnNext.addEventListener('click', () => this.playNext());
+        this.btnJumpTo.addEventListener('click', () => this.jumpToCurrentInPlaylist());
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => this.handleKeyboard(e));
@@ -384,6 +387,16 @@ const Player = {
 
         this.btnPrev.disabled = !hasPrev;
         this.btnNext.disabled = !hasNext;
+    },
+
+    /**
+     * Jump to and highlight current video in playlist
+     */
+    jumpToCurrentInPlaylist() {
+        if (this.currentVideo) {
+            Playlist.expandToVideo(this.currentVideo);
+            Playlist.setActiveVideo(this.currentVideo);
+        }
     },
 
     /**

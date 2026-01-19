@@ -267,16 +267,38 @@ const Playlist = {
     },
 
     /**
-     * Expand chapter containing a video
+     * Expand chapter containing a video (including all parent chapters)
      * @param {Object} video - Video object
      */
     expandToVideo(video) {
         if (!video.chapterObj) return;
 
-        // Find and expand parent chapters
-        const chapterId = this.getChapterId(video.chapterObj);
-        if (!this.expandedChapters.has(chapterId)) {
-            this.toggleChapter(chapterId);
+        // Find all chapters that need to be expanded by traversing the chapter path
+        const findAndExpandPath = (chapters, targetPath, pathSoFar = []) => {
+            for (const chapter of chapters) {
+                const chapterId = this.getChapterId(chapter);
+
+                if (chapter.path === video.chapterObj.path) {
+                    // Found the target chapter - expand all chapters in path
+                    [...pathSoFar, chapterId].forEach(id => {
+                        if (!this.expandedChapters.has(id)) {
+                            this.toggleChapter(id);
+                        }
+                    });
+                    return true;
+                }
+
+                if (chapter.children && chapter.children.length > 0) {
+                    if (findAndExpandPath(chapter.children, targetPath, [...pathSoFar, chapterId])) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        };
+
+        if (this.playlist?.chapters) {
+            findAndExpandPath(this.playlist.chapters, video.chapterObj.path);
         }
     },
 
