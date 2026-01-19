@@ -7,11 +7,15 @@ const Playlist = {
     // DOM elements
     container: null,
     collapseBtn: null,
+    searchInput: null,
+    clearSearchBtn: null,
 
     // State
     playlist: null,
     allVideos: [],  // Flat list of all videos for navigation
     expandedChapters: new Set(),
+    searchQuery: '',
+    searchDebounceTimer: null,
 
     /**
      * Initialize playlist module
@@ -19,8 +23,40 @@ const Playlist = {
     init() {
         this.container = document.getElementById('playlist-container');
         this.collapseBtn = document.getElementById('btn-collapse-all');
+        this.searchInput = document.getElementById('search-input');
+        this.clearSearchBtn = document.getElementById('btn-clear-search');
 
         this.collapseBtn.addEventListener('click', () => this.collapseAll());
+
+        // Search functionality
+        this.searchInput.addEventListener('input', (e) => {
+            clearTimeout(this.searchDebounceTimer);
+            this.searchDebounceTimer = setTimeout(() => {
+                this.search(e.target.value);
+            }, 150);
+        });
+
+        this.clearSearchBtn.addEventListener('click', () => {
+            this.searchInput.value = '';
+            this.clearSearchBtn.classList.remove('visible');
+            this.search('');
+            this.searchInput.focus();
+        });
+
+        // Keyboard shortcut: Ctrl+F or / to focus search
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey && e.key === 'f') || (e.key === '/' && !e.target.matches('input, select, textarea'))) {
+                e.preventDefault();
+                this.searchInput.focus();
+                this.searchInput.select();
+            }
+            // Escape to clear search
+            if (e.key === 'Escape' && document.activeElement === this.searchInput) {
+                this.searchInput.value = '';
+                this.search('');
+                this.searchInput.blur();
+            }
+        });
     },
 
     /**
@@ -422,6 +458,96 @@ const Playlist = {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    },
+
+    /**
+     * Search videos and chapters
+     * @param {string} query - Search query
+     */
+    search(query) {
+        this.searchQuery = query.trim().toLowerCase();
+
+        // Toggle clear button visibility
+        if (this.searchQuery) {
+            this.clearSearchBtn.classList.add('visible');
+        } else {
+            this.clearSearchBtn.classList.remove('visible');
+        }
+
+        if (!this.searchQuery) {
+            // No search - render normal playlist
+            this.render();
+            return;
+        }
+
+        // Find matching videos
+        const matchingVideos = this.allVideos.filter(video => {
+            const titleMatch = video.title.toLowerCase().includes(this.searchQuery);
+            const fileMatch = video.file?.toLowerCase().includes(this.searchQuery);
+            const chapterMatch = video.chapter?.toLowerCase().includes(this.searchQuery);
+            return titleMatch || fileMatch || chapterMatch;
+        });
+
+        this.renderSearchResults(matchingVideos);
+    },
+
+    /**
+     * Render search results
+     * @param {Array} videos - Matching videos
+     */
+    renderSearchResults(videos) {
+        if (videos.length === 0) {
+            this.container.innerHTML = `
+                <div class="no-results">
+                    <div class="no-results-icon">🔍</div>
+                    <div>No videos found for "${this.escapeHtml(this.searchQuery)}"</div>
+                </div>
+            `;
+            return;
+        }
+
+        let html = `<div class="search-results-info">${videos.length} result${videos.length !== 1 ? 's' : ''} for "${this.escapeHtml(this.searchQuery)}"</div>`;
+
+        for (const video of videos) {
+            const isCompleted = Progress.isVideoCompleted(video.path);
+            const isActive = App.state.currentVideo?.path === video.path;
+            const duration = this.formatDuration(video.duration);
+            const statusIcon = isCompleted ? '✓' : '○';
+
+            // Highlight matching text
+            const highlightedTitle = this.highlightMatch(video.title, this.searchQuery);
+            const chapterInfo = video.chapter ? `<div class="video-chapter-path">${this.highlightMatch(video.chapter, this.searchQuery)}</div>` : '';
+
+            html += `
+                <div class="video-item ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}"
+                     data-video-path="${this.escapeHtml(video.path)}"
+                     title="${this.escapeHtml(video.file || video.title)}">
+                    <span class="video-status">${statusIcon}</span>
+                    <div class="video-info">
+                        <div class="video-title">${highlightedTitle}</div>
+                        ${chapterInfo}
+                        <div class="video-duration">${duration}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        this.container.innerHTML = html;
+        this.attachEventListeners();
+    },
+
+    /**
+     * Highlight matching text in string
+     * @param {string} text - Original text
+     * @param {string} query - Search query
+     * @returns {string} - HTML with highlighted matches
+     */
+    highlightMatch(text, query) {
+        if (!query) return this.escapeHtml(text);
+
+        const escaped = this.escapeHtml(text);
+        const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+        return escaped.replace(regex, '<span class="search-highlight">$1</span>');
     }
 };
 
