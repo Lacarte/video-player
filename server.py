@@ -179,7 +179,69 @@ class VideoPlayerHandler(RangeHTTPRequestHandler):
             self.handle_duration_request()
             return
 
+        if path == '/api/open-folder':
+            self.handle_open_folder()
+            return
+
         self.send_error(404, "Not found")
+
+    def handle_open_folder(self):
+        """Open the folder containing a file and select it."""
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            data = json.loads(body)
+
+            file_path = data.get('path')
+            if not file_path:
+                self.send_error(400, "Missing 'path' parameter")
+                return
+
+            # Convert media path to actual file path
+            if file_path.startswith('/media/'):
+                relative = file_path[7:]  # Remove '/media/'
+                actual_path = self.course_path / unquote(relative)
+            else:
+                actual_path = self.course_path / unquote(file_path)
+
+            actual_path = actual_path.resolve()
+
+            # Security check
+            if not str(actual_path).startswith(str(self.course_path.resolve())):
+                self.send_error(403, "Access denied")
+                return
+
+            if not actual_path.exists():
+                # Try parent folder if file doesn't exist
+                actual_path = actual_path.parent
+
+            if actual_path.exists():
+                import subprocess
+                import platform
+
+                if platform.system() == 'Windows':
+                    if actual_path.is_file():
+                        # Open folder and select the file
+                        subprocess.run(['explorer', '/select,', str(actual_path)], check=False)
+                    else:
+                        # Just open the folder
+                        subprocess.run(['explorer', str(actual_path)], check=False)
+                elif platform.system() == 'Darwin':  # macOS
+                    if actual_path.is_file():
+                        subprocess.run(['open', '-R', str(actual_path)], check=False)
+                    else:
+                        subprocess.run(['open', str(actual_path)], check=False)
+                else:  # Linux
+                    folder = actual_path.parent if actual_path.is_file() else actual_path
+                    subprocess.run(['xdg-open', str(folder)], check=False)
+
+                self.send_json({'success': True})
+            else:
+                self.send_error(404, "Path not found")
+
+        except Exception as e:
+            print(f"Error opening folder: {e}")
+            self.send_error(500, str(e))
 
     def handle_duration_request(self):
         """Calculate duration for a single video (called one at a time from frontend)."""
@@ -225,11 +287,8 @@ class VideoPlayerHandler(RangeHTTPRequestHandler):
             self.send_response(200)
             self.send_header('Content-Type', content_type)
             self.send_header('Content-Length', len(content))
-            # Cache static files for 1 hour during development, use no-cache for HTML
-            if content_type == 'text/html':
-                self.send_header('Cache-Control', 'no-cache')
-            else:
-                self.send_header('Cache-Control', 'public, max-age=3600')
+            # No cache for development - easier to see changes
+            self.send_header('Cache-Control', 'no-cache, no-store, must-revalidate')
             self.send_header('Connection', 'keep-alive')
             self.end_headers()
             self.wfile.write(content)

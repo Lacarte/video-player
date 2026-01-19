@@ -118,20 +118,17 @@ const Playlist = {
 
         let html = '';
 
-        // Root level videos (if any)
-        if (this.playlist.videos && this.playlist.videos.length > 0) {
-            html += '<div class="root-videos">';
-            html += '<div class="root-videos-label">Videos</div>';
-            for (const video of this.playlist.videos) {
-                html += this.renderVideoItem(video);
-            }
-            html += '</div>';
-        }
+        // Combine root videos and chapters into a single list sorted by order
+        const rootVideos = (this.playlist.videos || []).map(v => ({ type: 'video', item: v, order: v.order }));
+        const chapters = (this.playlist.chapters || []).map(c => ({ type: 'chapter', item: c, order: c.order }));
+        const combined = [...rootVideos, ...chapters].sort((a, b) => a.order - b.order);
 
-        // Chapters
-        if (this.playlist.chapters) {
-            for (const chapter of this.playlist.chapters) {
-                html += this.renderChapter(chapter);
+        // Render items in order
+        for (const entry of combined) {
+            if (entry.type === 'video') {
+                html += this.renderVideoItem(entry.item);
+            } else {
+                html += this.renderChapter(entry.item);
             }
         }
 
@@ -150,8 +147,17 @@ const Playlist = {
         const isExpanded = this.expandedChapters.has(chapterId);
         const completion = this.getChapterCompletion(chapter);
         const videoCount = chapter.video_count || chapter.videos?.length || 0;
+        const docCount = chapter.documents?.length || 0;
         const duration = this.formatDuration(chapter.duration);
         const escapedId = this.escapeHtml(chapterId);
+
+        // Show video count if has videos, otherwise show document count
+        const metaInfo = videoCount > 0
+            ? `<span>${videoCount} videos</span><span>${duration}</span>`
+            : (docCount > 0 ? `<span>${docCount} docs</span>` : '');
+
+        // Build the folder path for opening
+        const folderPath = chapter.path ? `/media/${chapter.path}` : '';
 
         let html = `
             <div class="playlist-chapter" data-chapter-id="${escapedId}" style="margin-left: ${depth * 12}px;">
@@ -159,12 +165,14 @@ const Playlist = {
                     <span class="chapter-toggle ${isExpanded ? 'expanded' : ''}">▶</span>
                     <span class="chapter-title">${this.escapeHtml(chapter.title)}</span>
                     <div class="chapter-meta">
-                        <span>${videoCount}</span>
-                        <span>${duration}</span>
+                        ${metaInfo}
                     </div>
-                    <div class="chapter-progress">
-                        <div class="chapter-progress-bar" style="width: ${completion}%"></div>
-                    </div>
+                    ${videoCount > 0 ? `<div class="chapter-progress"><div class="chapter-progress-bar" style="width: ${completion}%"></div></div>` : ''}
+                    <button class="btn-open-folder" data-folder-path="${this.escapeHtml(folderPath)}" title="Open folder">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                    </button>
                 </div>
                 <div class="chapter-videos ${isExpanded ? 'expanded' : ''}" data-chapter-content="${escapedId}">
         `;
@@ -173,6 +181,13 @@ const Playlist = {
         if (chapter.videos) {
             for (const video of chapter.videos) {
                 html += this.renderVideoItem(video);
+            }
+        }
+
+        // Documents in this chapter
+        if (chapter.documents && chapter.documents.length > 0) {
+            for (const doc of chapter.documents) {
+                html += this.renderDocumentItem(doc);
             }
         }
 
@@ -185,6 +200,49 @@ const Playlist = {
 
         html += '</div></div>';
         return html;
+    },
+
+    /**
+     * Render a document item in the playlist
+     * @param {Object} doc - Document object
+     * @returns {string} - HTML string
+     */
+    renderDocumentItem(doc) {
+        const icon = this.getDocumentIcon(doc.type);
+        return `
+            <div class="document-item playlist-doc-item"
+                 data-doc-path="${this.escapeHtml(doc.path)}"
+                 data-doc-type="${doc.type}"
+                 data-doc-title="${this.escapeHtml(doc.title)}"
+                 data-doc-file="${this.escapeHtml(doc.file)}">
+                <span class="doc-icon">${icon}</span>
+                <span class="doc-name">${this.escapeHtml(doc.title)}</span>
+                <button class="btn-open-folder" data-path="${this.escapeHtml(doc.path)}" title="Open folder">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                </button>
+            </div>
+        `;
+    },
+
+    /**
+     * Get icon for document type
+     * @param {string} type - Document type
+     * @returns {string} - Emoji icon
+     */
+    getDocumentIcon(type) {
+        const icons = {
+            'pdf': '📕',
+            'html': '🌐',
+            'image': '🖼️',
+            'text': '📝',
+            'json': '📋',
+            'zip': '📦',
+            'docx': '📘',
+            'other': '📄'
+        };
+        return icons[type] || '📄';
     },
 
     /**
@@ -211,6 +269,11 @@ const Playlist = {
                     <div class="video-title">${this.escapeHtml(video.title)}</div>
                     <div class="video-duration">${duration}</div>
                 </div>
+                <button class="btn-open-folder" data-path="${this.escapeHtml(video.path)}" title="Open folder">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                </button>
             </div>
         `;
     },
@@ -222,6 +285,8 @@ const Playlist = {
         // Chapter headers
         this.container.querySelectorAll('.chapter-header').forEach(header => {
             header.addEventListener('click', (e) => {
+                // Ignore if clicking the folder button
+                if (e.target.closest('.btn-open-folder')) return;
                 e.stopPropagation(); // Prevent parent chapters from toggling
                 const chapterId = header.dataset.chapter;
                 this.toggleChapter(chapterId);
@@ -231,6 +296,8 @@ const Playlist = {
         // Video items
         this.container.querySelectorAll('.video-item').forEach(item => {
             item.addEventListener('click', (e) => {
+                // Ignore if clicking the folder button
+                if (e.target.closest('.btn-open-folder')) return;
                 e.stopPropagation(); // Prevent chapter toggle
                 const videoPath = decodeURIComponent(item.dataset.videoPath);
                 const video = this.allVideos.find(v => v.path === videoPath);
@@ -239,6 +306,44 @@ const Playlist = {
                 }
             });
         });
+
+        // Document items in playlist
+        this.container.querySelectorAll('.playlist-doc-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                // Ignore if clicking the folder button
+                if (e.target.closest('.btn-open-folder')) return;
+                e.stopPropagation(); // Prevent chapter toggle
+                Modal.open({
+                    type: item.dataset.docType,
+                    title: item.dataset.docTitle,
+                    path: item.dataset.docPath,
+                    file: item.dataset.docFile
+                });
+            });
+        });
+
+        // Open folder buttons
+        this.container.querySelectorAll('.btn-open-folder').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent any parent handlers
+                const path = btn.dataset.path || btn.dataset.folderPath;
+                if (path) {
+                    this.openFolder(path);
+                }
+            });
+        });
+    },
+
+    /**
+     * Open folder containing a file
+     * @param {string} path - File or folder path
+     */
+    openFolder(path) {
+        fetch('/api/open-folder', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path })
+        }).catch(err => console.error('Failed to open folder:', err));
     },
 
     /**

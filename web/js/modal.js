@@ -83,6 +83,9 @@ const Modal = {
             case 'zip':
                 this.loadZipInfo(doc);
                 break;
+            case 'docx':
+                this.loadDocxInfo(doc);
+                break;
             default:
                 this.loadUnsupported(doc);
         }
@@ -218,6 +221,26 @@ const Modal = {
                 <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 20px;">
                     ZIP files cannot be previewed in the browser.<br>
                     Use the download button to save and extract locally.
+                </p>
+                <div style="background: var(--bg-tertiary); padding: 16px; border-radius: 8px; font-family: monospace; font-size: 0.85rem;">
+                    ${this.escapeHtml(doc.file)}
+                </div>
+            </div>
+        `;
+    },
+
+    /**
+     * Show DOCX file info (cannot preview in browser)
+     * @param {Object} doc - Document object
+     */
+    loadDocxInfo(doc) {
+        this.body.innerHTML = `
+            <div class="empty-state" style="padding: 60px 20px;">
+                <div class="empty-icon">📘</div>
+                <div class="empty-text" style="margin-bottom: 16px;">Word Document</div>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 20px;">
+                    Word documents cannot be previewed in the browser.<br>
+                    Use the download button to open in Microsoft Word or another compatible application.
                 </p>
                 <div style="background: var(--bg-tertiary); padding: 16px; border-radius: 8px; font-family: monospace; font-size: 0.85rem;">
                     ${this.escapeHtml(doc.file)}

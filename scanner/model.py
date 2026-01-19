@@ -25,6 +25,7 @@ class DocumentType(Enum):
     JSON = "json"
     ZIP = "zip"
     HTML = "html"
+    DOCX = "docx"
     OTHER = "other"
 
 

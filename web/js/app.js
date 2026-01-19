@@ -419,6 +419,7 @@ const App = {
             'text': '📝',
             'json': '📋',
             'zip': '📦',
+            'docx': '📘',
             'other': '📄'
         };
         return icons[type] || '📄';

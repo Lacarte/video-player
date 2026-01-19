@@ -36,12 +36,13 @@ def extract_sort_key(name: str) -> Tuple[int, str]:
         return (999998, base_name.lower())
 
     # Pattern 1: Number at START
-    # Matches: "1_", "01 ", "1.", "1-", "[1]", "(1)", "1a" etc.
+    # Matches: "1_", "01 ", "1.", "1-", "[1]", "(1)", "1a", or just "1" etc.
     start_patterns = [
         r'^(\d+)[\s_\-\.\)\]]+(.*)$',  # "1_intro", "01 - intro", "1.intro"
         r'^\[(\d+)\][\s_\-\.]*(.*)$',   # "[1] intro", "[01]intro"
         r'^\((\d+)\)[\s_\-\.]*(.*)$',   # "(1) intro"
         r'^(\d+)([a-zA-Z].*)$',          # "1a", "01intro"
+        r'^(\d+)()$',                     # Just "1", "01", "123" (bare number)
     ]
 
     for pattern in start_patterns:

@@ -28,7 +28,7 @@ from .ordering import sort_items, extract_sort_key, get_clean_title
 VIDEO_EXTENSIONS = {'.mp4', '.mkv', '.webm', '.avi', '.mov', '.m4v'}
 SUBTITLE_EXTENSIONS = {'.srt', '.vtt'}
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'}
-DOCUMENT_EXTENSIONS = {'.pdf', '.txt', '.json', '.zip', '.rar', '.7z', '.md', '.html', '.htm'}
+DOCUMENT_EXTENSIONS = {'.pdf', '.txt', '.json', '.zip', '.rar', '.7z', '.md', '.html', '.htm', '.docx'}
 
 # Folders to ignore
 IGNORE_FOLDERS = {'.git', '__pycache__', 'node_modules', '.vscode', 'trash', 'deleteVideos', '.idea'}
@@ -49,6 +49,8 @@ def get_document_type(extension: str) -> DocumentType:
         return DocumentType.ZIP
     elif ext in {'.html', '.htm'}:
         return DocumentType.HTML
+    elif ext == '.docx':
+        return DocumentType.DOCX
     else:
         return DocumentType.OTHER
 
@@ -237,7 +239,7 @@ def scan_folder(
                     if entry.name not in IGNORE_FOLDERS:
                         folders.append(item_path)
     except (PermissionError, OSError):
-        return videos, documents, sub_chapters
+        return [], [], []
 
     # Helper to get creation time (for items starting with "-")
     def get_ctime(path):
@@ -282,7 +284,6 @@ def scan_folder(
             )
             documents.append(doc)
 
-    chapter_order = 1
     for folder in folders:
         sub_videos, sub_docs, sub_sub_chapters = scan_folder(
             folder, root_path, all_files, depth + 1
@@ -310,33 +311,47 @@ def scan_folder(
         if is_wrapper_folder:
             # Promote the single video to parent level
             # The video already has its subtitles linked
+            # Use the folder's sort key for ordering so "0. Intro" folder sorts before "1. Basics"
+            # Also use the folder name as the video title (preserving numbering like "0. Introducción")
+            folder_sort_num, _ = extract_sort_key(folder.name)
+            for vid in sub_videos:
+                vid.order = folder_sort_num
+                vid.title = folder.name  # Use folder name as title to preserve numbering
             videos.extend(sub_videos)
             # Also promote any documents
             documents.extend(sub_docs)
         elif has_videos:
             # Normal chapter with videos
+            # Use full folder name to preserve numbering (e.g., "1. Generación de la Idea")
+            # Extract order from folder name for proper sorting
+            folder_sort_num, _ = extract_sort_key(folder.name)
             chapter = Chapter(
-                title=get_clean_title(folder.name),
-                order=chapter_order,
+                title=folder.name,
+                order=folder_sort_num,
                 path=str(folder.relative_to(root_path)),
                 videos=sub_videos,
                 documents=sub_docs,
                 children=sub_sub_chapters
             )
             sub_chapters.append(chapter)
-            chapter_order += 1
         elif sub_docs or sub_sub_chapters:
-            # No videos - merge documents into parent's documents list
-            # Collect all documents from this folder and its subfolders
-            def collect_all_docs(docs, chapters):
-                all_docs = list(docs)
-                for ch in chapters:
-                    all_docs.extend(collect_all_docs(ch.documents, ch.children))
-                return all_docs
+            # Folder has documents but no videos - still show as chapter
+            # Extract order from folder name for proper sorting
+            folder_sort_num, _ = extract_sort_key(folder.name)
+            chapter = Chapter(
+                title=folder.name,
+                order=folder_sort_num,
+                path=str(folder.relative_to(root_path)),
+                videos=[],
+                documents=sub_docs,
+                children=sub_sub_chapters
+            )
+            sub_chapters.append(chapter)
 
-            merged_docs = collect_all_docs(sub_docs, sub_sub_chapters)
-            documents.extend(merged_docs)
-
+    # Sort videos by order (important when videos are promoted from wrapper folders)
+    videos.sort(key=lambda v: (v.order, v.title.lower()))
+    # Sort chapters by order (extracted from folder name)
+    sub_chapters.sort(key=lambda c: (c.order, c.title.lower()))
     return videos, documents, sub_chapters
 
 
