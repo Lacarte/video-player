@@ -86,15 +86,21 @@ const Player = {
 
         this.currentVideo = video;
 
+        // Show loading state
+        this.overlay.classList.remove('hidden');
+        this.overlay.querySelector('.overlay-text').textContent = 'Loading...';
+
         // Clear existing subtitles
         this.clearSubtitles();
+
+        // Switch to auto preload for faster buffering when user selects a video
+        this.video.preload = 'auto';
 
         // Set video source
         this.video.src = video.path;
 
         // Update UI
         this.nowPlayingTitle.textContent = video.title;
-        this.overlay.classList.add('hidden');
 
         // Load subtitles if available
         if (video.subtitles && video.subtitles.length > 0) {
@@ -103,24 +109,47 @@ const Player = {
             this.subtitleGroup.style.display = 'none';
         }
 
-        // Restore progress after metadata loads
+        // Restore progress and hide overlay when ready
         const savedProgress = Progress.getVideoProgress(video.path);
-        if (savedProgress > 0) {
-            // Set currentTime after metadata is loaded for better seeking
-            const onCanPlay = () => {
+        const onCanPlay = () => {
+            // Hide loading overlay
+            this.overlay.classList.add('hidden');
+            // Restore position if saved
+            if (savedProgress > 0) {
                 this.video.currentTime = savedProgress;
-                this.video.removeEventListener('canplay', onCanPlay);
-            };
-            this.video.addEventListener('canplay', onCanPlay);
-        }
+            }
+            this.video.removeEventListener('canplay', onCanPlay);
+        };
+        this.video.addEventListener('canplay', onCanPlay);
 
-        // Start playing (setting src already triggers load with preload="metadata")
+        // Start playing
         this.video.play().catch(e => {
             console.log('Autoplay prevented:', e);
+            // Still hide overlay even if autoplay blocked
+            this.overlay.classList.add('hidden');
         });
 
         // Update navigation buttons
         this.updateNavButtons();
+
+        // Preload next video in background
+        this.preloadNextVideo();
+    },
+
+    /**
+     * Preload next video for faster playback
+     */
+    preloadNextVideo() {
+        const nextVideo = Playlist.getNextVideo(this.currentVideo);
+        if (nextVideo && !this.preloadedVideo) {
+            // Create hidden video element to preload
+            this.preloadedVideo = document.createElement('video');
+            this.preloadedVideo.preload = 'metadata';
+            this.preloadedVideo.src = nextVideo.path;
+            this.preloadedVideo.muted = true;
+            // Just load metadata, don't play
+            this.preloadedVideo.load();
+        }
     },
 
     /**

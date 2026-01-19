@@ -102,8 +102,8 @@ class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
 class LimitedFileWrapper:
     """Wrapper to limit file reads for Range requests."""
 
-    # 256KB chunks for efficient streaming
-    CHUNK_SIZE = 256 * 1024
+    # 512KB chunks for faster streaming
+    CHUNK_SIZE = 512 * 1024
 
     def __init__(self, f, length):
         self.f = f
@@ -290,6 +290,14 @@ class ThreadedHTTPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     """Threaded HTTP server for handling multiple connections."""
     allow_reuse_address = True
     daemon_threads = True
+
+    def server_bind(self):
+        """Bind with optimized socket settings."""
+        import socket
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        # Disable Nagle's algorithm for lower latency
+        self.socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        super().server_bind()
 
     def handle_error(self, request, client_address):
         """Suppress connection reset errors."""
