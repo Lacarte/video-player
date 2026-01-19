@@ -15,6 +15,7 @@ import re
 import subprocess
 import json
 import hashlib
+import unicodedata
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 from urllib.parse import quote
@@ -27,7 +28,7 @@ from .ordering import sort_items, extract_sort_key, get_clean_title
 VIDEO_EXTENSIONS = {'.mp4', '.mkv', '.webm', '.avi', '.mov', '.m4v'}
 SUBTITLE_EXTENSIONS = {'.srt', '.vtt'}
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'}
-DOCUMENT_EXTENSIONS = {'.pdf', '.txt', '.json', '.zip', '.rar', '.7z', '.md', '.html'}
+DOCUMENT_EXTENSIONS = {'.pdf', '.txt', '.json', '.zip', '.rar', '.7z', '.md', '.html', '.htm'}
 
 # Folders to ignore
 IGNORE_FOLDERS = {'.git', '__pycache__', 'node_modules', '.vscode', 'trash', 'deleteVideos', '.idea'}
@@ -113,6 +114,10 @@ def generate_structure_hash(root_path: Path) -> str:
 def find_subtitles(video_path: Path, all_files: List[Path]) -> List[Subtitle]:
     """
     Find subtitle files matching a video.
+
+    Matching rules (in order of priority):
+    1. Exact name match: video.mp4 -> video.srt, video.en.srt
+    2. Flexible: If only one video in folder, link ALL subtitle files in that folder
     """
     video_stem = video_path.stem.lower()
     video_dir = video_path.parent
@@ -131,30 +136,51 @@ def find_subtitles(video_path: Path, all_files: List[Path]) -> List[Subtitle]:
         'ko': 'Korean', 'kor': 'Korean', 'korean': 'Korean',
     }
 
-    for file_path in all_files:
-        if file_path.suffix.lower() not in SUBTITLE_EXTENSIONS:
-            continue
-        if file_path.parent != video_dir:
-            continue
+    # Get all subtitle files in the same directory
+    dir_subtitles = [f for f in all_files
+                     if f.suffix.lower() in SUBTITLE_EXTENSIONS and f.parent == video_dir]
 
+    # Count videos in the same directory
+    dir_videos = [f for f in all_files
+                  if f.suffix.lower() in VIDEO_EXTENSIONS and f.parent == video_dir]
+
+    # If only one video in folder, link ALL subtitles in that folder
+    is_single_video_folder = len(dir_videos) == 1
+
+    for file_path in dir_subtitles:
         sub_stem = file_path.stem.lower()
 
-        if not sub_stem.startswith(video_stem):
+        # Check if subtitle matches video name
+        name_matches = sub_stem.startswith(video_stem)
+
+        # Skip if name doesn't match AND there are multiple videos in folder
+        if not name_matches and not is_single_video_folder:
             continue
 
-        remainder = sub_stem[len(video_stem):]
+        # Try to extract language from filename
         lang = 'en'
         label = 'English'
+
+        # Check for language code in filename
+        if name_matches:
+            remainder = sub_stem[len(video_stem):]
+        else:
+            # Use whole filename for language detection
+            remainder = sub_stem
 
         if remainder:
             remainder = remainder.lstrip('._- ')
             for code, name in lang_codes.items():
-                if remainder == code or remainder.startswith(code + '.'):
+                if remainder == code or remainder.startswith(code + '.') or code in remainder.lower():
                     lang = code[:2] if len(code) > 2 else code
                     label = name
                     break
             else:
-                if remainder:
+                # No known language code found
+                if remainder and not name_matches:
+                    # Use subtitle filename as label if it doesn't match video
+                    label = file_path.stem
+                elif remainder:
                     lang = remainder[:2]
                     label = remainder.capitalize()
 
@@ -190,12 +216,26 @@ def scan_folder(
     sub_chapters = []
 
     try:
-        items = list(folder_path.iterdir())
-    except PermissionError:
-        return videos, documents, sub_chapters
+        # Use os.scandir with long path support for Windows
+        scan_path = _to_long_path(str(folder_path.resolve()))
+        items = []
+        files = []
+        folders = []
 
-    files = [f for f in items if f.is_file() and not f.name.startswith('.')]
-    folders = [f for f in items if f.is_dir() and f.name not in IGNORE_FOLDERS and not f.name.startswith('.')]
+        with os.scandir(scan_path) as entries:
+            for entry in entries:
+                if entry.name.startswith('.'):
+                    continue
+                # Build path without \\?\ prefix
+                item_path = Path(folder_path) / entry.name
+
+                if entry.is_file(follow_symlinks=False):
+                    files.append(item_path)
+                elif entry.is_dir(follow_symlinks=False):
+                    if entry.name not in IGNORE_FOLDERS:
+                        folders.append(item_path)
+    except (PermissionError, OSError):
+        return videos, documents, sub_chapters
 
     # Helper to get creation time (for items starting with "-")
     def get_ctime(path):
@@ -246,7 +286,33 @@ def scan_folder(
             folder, root_path, all_files, depth + 1
         )
 
-        if sub_videos or sub_docs or sub_sub_chapters:
+        # Check if this folder has any videos (directly or in children)
+        def has_videos_recursive(vids, chapters):
+            if vids:
+                return True
+            for ch in chapters:
+                if has_videos_recursive(ch.videos, ch.children):
+                    return True
+            return False
+
+        has_videos = has_videos_recursive(sub_videos, sub_sub_chapters)
+
+        # Check if this is a "wrapper" folder: contains only 1 video and no child chapters
+        # These folders exist just to keep video + subtitles organized together
+        # Flatten them by promoting the video to the parent level
+        is_wrapper_folder = (
+            len(sub_videos) == 1 and
+            len(sub_sub_chapters) == 0
+        )
+
+        if is_wrapper_folder:
+            # Promote the single video to parent level
+            # The video already has its subtitles linked
+            videos.extend(sub_videos)
+            # Also promote any documents
+            documents.extend(sub_docs)
+        elif has_videos:
+            # Normal chapter with videos
             chapter = Chapter(
                 title=get_clean_title(folder.name),
                 order=chapter_order,
@@ -257,18 +323,67 @@ def scan_folder(
             )
             sub_chapters.append(chapter)
             chapter_order += 1
+        elif sub_docs or sub_sub_chapters:
+            # No videos - merge documents into parent's documents list
+            # Collect all documents from this folder and its subfolders
+            def collect_all_docs(docs, chapters):
+                all_docs = list(docs)
+                for ch in chapters:
+                    all_docs.extend(collect_all_docs(ch.documents, ch.children))
+                return all_docs
+
+            merged_docs = collect_all_docs(sub_docs, sub_sub_chapters)
+            documents.extend(merged_docs)
 
     return videos, documents, sub_chapters
 
 
+def _to_long_path(path_str: str) -> str:
+    """Convert path string to Windows long path format.
+
+    Windows has a 260 character path limit. Using \\?\ prefix bypasses this.
+    """
+    if os.name == 'nt' and not path_str.startswith('\\\\?\\'):
+        # Convert forward slashes and make absolute
+        path_str = os.path.abspath(path_str)
+        return '\\\\?\\' + path_str
+    return path_str
+
+
 def get_all_files(root_path: Path) -> List[Path]:
-    """Get all files in the directory tree."""
+    """Get all files in the directory tree.
+
+    Handles Windows long paths (>260 chars) by using \\?\ prefix.
+    """
     all_files = []
-    for root, dirs, files in os.walk(root_path):
-        dirs[:] = [d for d in dirs if d not in IGNORE_FOLDERS and not d.startswith('.')]
-        for f in files:
-            if not f.startswith('.'):
-                all_files.append(Path(root) / f)
+    root_str = str(root_path.resolve())
+
+    def scan_dir(dir_path: str):
+        try:
+            # Use long path format on Windows for scanning
+            scan_path = _to_long_path(dir_path)
+
+            with os.scandir(scan_path) as entries:
+                for entry in entries:
+                    name = entry.name
+                    if name.startswith('.'):
+                        continue
+                    if name in IGNORE_FOLDERS:
+                        continue
+
+                    # Build the normal path (without \\?\ prefix)
+                    item_path = os.path.join(dir_path, name)
+
+                    if entry.is_dir(follow_symlinks=False):
+                        scan_dir(item_path)
+                    elif entry.is_file(follow_symlinks=False):
+                        all_files.append(Path(item_path))
+        except PermissionError:
+            pass
+        except OSError:
+            pass
+
+    scan_dir(root_str)
     return all_files
 
 

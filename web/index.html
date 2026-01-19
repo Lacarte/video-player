@@ -43,11 +43,20 @@
 
         <!-- Main Layout -->
         <div class="app-layout">
+            <!-- Sidebar Toggle (when collapsed) -->
+            <button class="panel-toggle panel-toggle-left hidden" id="sidebar-toggle" title="Show Playlist">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="9" y1="3" x2="9" y2="21"></line>
+                </svg>
+            </button>
+
             <!-- Sidebar: Playlist -->
             <aside class="sidebar" id="sidebar">
                 <div class="sidebar-header">
                     <h2>Playlist</h2>
-                    <button class="btn-icon" id="btn-collapse-all" title="Collapse all">
+                    <div class="header-buttons">
+                        <button class="btn-icon" id="btn-collapse-all" title="Collapse all">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <polyline points="4 14 10 14 10 20"></polyline>
                             <polyline points="20 10 14 10 14 4"></polyline>
@@ -55,6 +64,13 @@
                             <line x1="3" y1="21" x2="10" y2="14"></line>
                         </svg>
                     </button>
+                        <button class="btn-icon" id="btn-hide-sidebar" title="Hide Playlist">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="11 17 6 12 11 7"></polyline>
+                                <polyline points="18 17 13 12 18 7"></polyline>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
                 <div class="search-box">
                     <input type="text" id="search-input" placeholder="Search videos..." autocomplete="off">
@@ -140,7 +156,15 @@
             <aside class="documents-panel" id="documents-panel">
                 <div class="panel-header">
                     <h2>Documents</h2>
-                    <span class="doc-count" id="doc-count">0</span>
+                    <div class="header-buttons">
+                        <span class="doc-count" id="doc-count">0</span>
+                        <button class="btn-icon" id="btn-hide-docs" title="Hide Documents">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="13 17 18 12 13 7"></polyline>
+                                <polyline points="6 17 11 12 6 7"></polyline>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
                 <div class="documents-list" id="documents-list">
                     <!-- Documents rendered by JS -->
@@ -150,6 +174,14 @@
                     </div>
                 </div>
             </aside>
+
+            <!-- Documents Toggle (when collapsed) -->
+            <button class="panel-toggle panel-toggle-right hidden" id="docs-toggle" title="Show Documents">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                </svg>
+            </button>
         </div>
     </div>
 

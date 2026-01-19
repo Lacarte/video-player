@@ -189,6 +189,53 @@ body {
     font-weight: 600;
 }
 
+.header-buttons {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Panel Toggle Buttons */
+.panel-toggle {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 12px 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    z-index: 10;
+}
+
+.panel-toggle:hover {
+    background: var(--bg-elevated);
+    color: var(--accent-primary);
+    border-color: var(--accent-primary);
+}
+
+.panel-toggle-left {
+    left: 0;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    border-left: none;
+}
+
+.panel-toggle-right {
+    right: 0;
+    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+    border-right: none;
+}
+
+/* Collapsed Panel States */
+.sidebar.collapsed,
+.documents-panel.collapsed {
+    display: none;
+}
+
 /* Search Box */
 .search-box {
     padding: 12px;

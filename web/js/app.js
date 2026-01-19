@@ -14,6 +14,10 @@ const App = {
     documentsList: null,
     docCount: null,
     toastContainer: null,
+    sidebar: null,
+    documentsPanel: null,
+    sidebarToggle: null,
+    docsToggle: null,
 
     // State
     state: {
@@ -41,12 +45,17 @@ const App = {
         this.documentsList = document.getElementById('documents-list');
         this.docCount = document.getElementById('doc-count');
         this.toastContainer = document.getElementById('toast-container');
+        this.sidebar = document.getElementById('sidebar');
+        this.documentsPanel = document.getElementById('documents-panel');
+        this.sidebarToggle = document.getElementById('sidebar-toggle');
+        this.docsToggle = document.getElementById('docs-toggle');
 
         // Initialize modules
         Modal.init();
         Playlist.init();
         Player.init();
         this.initSidebarResize();
+        this.initPanelToggles();
 
         // Load playlist data
         try {
@@ -412,6 +421,67 @@ const App = {
             'other': '📄'
         };
         return icons[type] || '📄';
+    },
+
+    /**
+     * Initialize panel toggle functionality
+     */
+    initPanelToggles() {
+        const btnHideSidebar = document.getElementById('btn-hide-sidebar');
+        const btnHideDocs = document.getElementById('btn-hide-docs');
+
+        // Sidebar toggle
+        btnHideSidebar?.addEventListener('click', () => this.toggleSidebar(false));
+        this.sidebarToggle?.addEventListener('click', () => this.toggleSidebar(true));
+
+        // Documents toggle
+        btnHideDocs?.addEventListener('click', () => this.toggleDocuments(false));
+        this.docsToggle?.addEventListener('click', () => this.toggleDocuments(true));
+
+        // Restore saved state
+        const sidebarHidden = localStorage.getItem('video_player:sidebar_hidden') === 'true';
+        const docsHidden = localStorage.getItem('video_player:docs_hidden') === 'true';
+
+        if (sidebarHidden) this.toggleSidebar(false, true);
+        if (docsHidden) this.toggleDocuments(false, true);
+    },
+
+    /**
+     * Toggle sidebar visibility
+     * @param {boolean} show - Whether to show or hide
+     * @param {boolean} skipSave - Skip saving preference
+     */
+    toggleSidebar(show, skipSave = false) {
+        if (show) {
+            this.sidebar.classList.remove('collapsed');
+            this.sidebarToggle.classList.add('hidden');
+        } else {
+            this.sidebar.classList.add('collapsed');
+            this.sidebarToggle.classList.remove('hidden');
+        }
+
+        if (!skipSave) {
+            localStorage.setItem('video_player:sidebar_hidden', !show);
+        }
+    },
+
+    /**
+     * Toggle documents panel visibility
+     * @param {boolean} show - Whether to show or hide
+     * @param {boolean} skipSave - Skip saving preference
+     */
+    toggleDocuments(show, skipSave = false) {
+        if (show) {
+            this.documentsPanel.classList.remove('collapsed');
+            this.docsToggle.classList.add('hidden');
+        } else {
+            this.documentsPanel.classList.add('collapsed');
+            this.docsToggle.classList.remove('hidden');
+        }
+
+        if (!skipSave) {
+            localStorage.setItem('video_player:docs_hidden', !show);
+        }
     },
 
     /**

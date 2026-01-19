@@ -86,7 +86,7 @@ def sort_items(items: list, key_func=None, ctime_func=None) -> list:
         key_func: Optional function to extract the name from each item.
                   If None, assumes items are strings.
         ctime_func: Optional function to extract creation time from each item.
-                    Used for items starting with "-" which sort by creation date.
+                    (Currently unused - kept for API compatibility)
 
     Returns:
         Sorted list
@@ -97,16 +97,9 @@ def sort_items(items: list, key_func=None, ctime_func=None) -> list:
     def sort_key(item):
         name = key_func(item)
         num, alpha = extract_sort_key(name)
-
-        # For items starting with "-", use creation time as secondary sort
-        if name.startswith('-') and ctime_func is not None:
-            try:
-                ctime = ctime_func(item)
-                return (num, ctime, alpha)
-            except:
-                pass
-
-        return (num, 0, alpha)
+        # Items starting with "-" get num=999998 and sort alphabetically (via alpha)
+        # All other items sort by num first, then alphabetically
+        return (num, alpha)
 
     return sorted(items, key=sort_key)
 
