@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Player</title>
+    <link rel="stylesheet" href="/static/player.css">
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Loading course...</div>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <h1 id="course-title">Video Player</h1>
+                <span class="header-badge" id="port-badge">Port: --</span>
+            </div>
+            <div class="header-right">
+                <div class="course-stats">
+                    <span class="stat-item" id="stat-videos">
+                        <span class="stat-icon">🎬</span>
+                        <span class="stat-value">0</span> videos
+                    </span>
+                    <span class="stat-item" id="stat-duration">
+                        <span class="stat-icon">⏱</span>
+                        <span class="stat-value">0:00</span>
+                    </span>
+                    <span class="stat-item" id="stat-progress">
+                        <span class="stat-icon">📊</span>
+                        <span class="stat-value">0%</span> complete
+                    </span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Layout -->
+        <div class="app-layout">
+            <!-- Sidebar: Playlist -->
+            <aside class="sidebar" id="sidebar">
+                <div class="sidebar-header">
+                    <h2>Playlist</h2>
+                    <button class="btn-icon" id="btn-collapse-all" title="Collapse all">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="4 14 10 14 10 20"></polyline>
+                            <polyline points="20 10 14 10 14 4"></polyline>
+                            <line x1="14" y1="10" x2="21" y2="3"></line>
+                            <line x1="3" y1="21" x2="10" y2="14"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div class="playlist-container" id="playlist-container">
+                    <!-- Playlist items rendered by JS -->
+                </div>
+                <div class="resize-handle" id="sidebar-resize"></div>
+            </aside>
+
+            <!-- Main Content: Video Player -->
+            <main class="main-content">
+                <div class="player-area">
+                    <!-- Video Container -->
+                    <div class="video-container" id="video-container">
+                        <video id="video-player" controls>
+                            <source src="" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
+
+                        <!-- Video Overlay (for loading/error states) -->
+                        <div class="video-overlay" id="video-overlay">
+                            <div class="overlay-content">
+                                <div class="overlay-icon">🎬</div>
+                                <div class="overlay-text">Select a video to play</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Player Controls -->
+                    <div class="player-controls">
+                        <div class="controls-left">
+                            <button class="btn-control" id="btn-prev" title="Previous (Shift+P)">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/>
+                                </svg>
+                            </button>
+                            <button class="btn-control" id="btn-next" title="Next (Shift+N)">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div class="controls-center">
+                            <div class="now-playing">
+                                <span class="now-playing-label">Now Playing:</span>
+                                <span class="now-playing-title" id="now-playing-title">-</span>
+                            </div>
+                        </div>
+
+                        <div class="controls-right">
+                            <div class="control-group">
+                                <label for="speed-select">Speed:</label>
+                                <select id="speed-select" class="control-select">
+                                    <option value="0.5">0.5x</option>
+                                    <option value="0.75">0.75x</option>
+                                    <option value="1" selected>1x</option>
+                                    <option value="1.25">1.25x</option>
+                                    <option value="1.5">1.5x</option>
+                                    <option value="1.75">1.75x</option>
+                                    <option value="2">2x</option>
+                                </select>
+                            </div>
+
+                            <div class="control-group" id="subtitle-group" style="display: none;">
+                                <label for="subtitle-select">Subtitles:</label>
+                                <select id="subtitle-select" class="control-select">
+                                    <option value="">Off</option>
+                                </select>
+                            </div>
+
+                            <label class="control-checkbox">
+                                <input type="checkbox" id="autoplay-toggle" checked>
+                                <span>Auto-play</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Right Panel: Documents -->
+            <aside class="documents-panel" id="documents-panel">
+                <div class="panel-header">
+                    <h2>Documents</h2>
+                    <span class="doc-count" id="doc-count">0</span>
+                </div>
+                <div class="documents-list" id="documents-list">
+                    <!-- Documents rendered by JS -->
+                    <div class="empty-state">
+                        <div class="empty-icon">📄</div>
+                        <div class="empty-text">No documents in this section</div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- Document Modal -->
+    <div class="modal" id="doc-modal">
+        <div class="modal-backdrop" id="modal-backdrop"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Document</h3>
+                <button class="modal-close" id="modal-close">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body">
+                <!-- Content injected by JS -->
+            </div>
+            <div class="modal-footer">
+                <a class="btn btn-primary" id="modal-download" href="#" download>Download</a>
+                <button class="btn btn-secondary" id="modal-close-btn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="/static/progress.js"></script>
+    <script src="/static/modal.js"></script>
+    <script src="/static/playlist.js"></script>
+    <script src="/static/player.js"></script>
+    <script src="/static/app.js"></script>
+</body>
+</html>

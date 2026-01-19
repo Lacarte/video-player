@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+scanner/bin/
+COURSE/
+dir.txt
+reproduce_ordering.py

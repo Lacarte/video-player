@@ -1,0 +1,429 @@
+/**
+ * Playlist module
+ * Handles sidebar navigation, chapter expansion, and video selection
+ */
+
+const Playlist = {
+    // DOM elements
+    container: null,
+    collapseBtn: null,
+
+    // State
+    playlist: null,
+    allVideos: [],  // Flat list of all videos for navigation
+    expandedChapters: new Set(),
+
+    /**
+     * Initialize playlist module
+     */
+    init() {
+        this.container = document.getElementById('playlist-container');
+        this.collapseBtn = document.getElementById('btn-collapse-all');
+
+        this.collapseBtn.addEventListener('click', () => this.collapseAll());
+    },
+
+    /**
+     * Load playlist data and render
+     * @param {Object} data - Playlist data from API
+     */
+    load(data) {
+        this.playlist = data;
+        this.allVideos = this.flattenVideos(data);
+        this.render();
+    },
+
+    /**
+     * Flatten all videos into a single array for easy navigation
+     * @param {Object} data - Playlist data
+     * @returns {Array} - Flat array of video objects
+     */
+    flattenVideos(data) {
+        const videos = [];
+
+        // Root level videos
+        if (data.videos) {
+            for (const video of data.videos) {
+                videos.push({ ...video, chapter: null });
+            }
+        }
+
+        // Chapter videos (recursive)
+        const processChapter = (chapter, parentPath = '') => {
+            const chapterPath = parentPath ? `${parentPath}/${chapter.title}` : chapter.title;
+
+            if (chapter.videos) {
+                for (const video of chapter.videos) {
+                    videos.push({ ...video, chapter: chapterPath, chapterObj: chapter });
+                }
+            }
+
+            if (chapter.children) {
+                for (const child of chapter.children) {
+                    processChapter(child, chapterPath);
+                }
+            }
+        };
+
+        if (data.chapters) {
+            for (const chapter of data.chapters) {
+                processChapter(chapter);
+            }
+        }
+
+        return videos;
+    },
+
+    /**
+     * Render the playlist
+     */
+    render() {
+        if (!this.playlist) return;
+
+        let html = '';
+
+        // Root level videos (if any)
+        if (this.playlist.videos && this.playlist.videos.length > 0) {
+            html += '<div class="root-videos">';
+            html += '<div class="root-videos-label">Videos</div>';
+            for (const video of this.playlist.videos) {
+                html += this.renderVideoItem(video);
+            }
+            html += '</div>';
+        }
+
+        // Chapters
+        if (this.playlist.chapters) {
+            for (const chapter of this.playlist.chapters) {
+                html += this.renderChapter(chapter);
+            }
+        }
+
+        this.container.innerHTML = html;
+        this.attachEventListeners();
+    },
+
+    /**
+     * Render a chapter (recursive for sub-chapters)
+     * @param {Object} chapter - Chapter object
+     * @param {number} depth - Nesting depth
+     * @returns {string} - HTML string
+     */
+    renderChapter(chapter, depth = 0) {
+        const chapterId = this.getChapterId(chapter);
+        const isExpanded = this.expandedChapters.has(chapterId);
+        const completion = this.getChapterCompletion(chapter);
+        const videoCount = chapter.video_count || chapter.videos?.length || 0;
+        const duration = this.formatDuration(chapter.duration);
+
+        let html = `
+            <div class="playlist-chapter" data-chapter-id="${chapterId}" style="margin-left: ${depth * 12}px;">
+                <div class="chapter-header ${isExpanded ? 'expanded' : ''}" data-chapter="${chapterId}" title="${this.escapeHtml(chapter.title)}">
+                    <span class="chapter-toggle ${isExpanded ? 'expanded' : ''}">▶</span>
+                    <span class="chapter-title">${this.escapeHtml(chapter.title)}</span>
+                    <div class="chapter-meta">
+                        <span>${videoCount}</span>
+                        <span>${duration}</span>
+                    </div>
+                    <div class="chapter-progress">
+                        <div class="chapter-progress-bar" style="width: ${completion}%"></div>
+                    </div>
+                </div>
+                <div class="chapter-videos ${isExpanded ? 'expanded' : ''}" data-chapter-content="${chapterId}">
+        `;
+
+        // Videos in this chapter
+        if (chapter.videos) {
+            for (const video of chapter.videos) {
+                html += this.renderVideoItem(video);
+            }
+        }
+
+        // Sub-chapters
+        if (chapter.children) {
+            for (const child of chapter.children) {
+                html += this.renderChapter(child, depth + 1);
+            }
+        }
+
+        html += '</div></div>';
+        return html;
+    },
+
+    /**
+     * Render a video item
+     * @param {Object} video - Video object
+     * @returns {string} - HTML string
+     */
+    renderVideoItem(video) {
+        const isCompleted = Progress.isVideoCompleted(video.path);
+        const isActive = App.state.currentVideo?.path === video.path;
+        const duration = this.formatDuration(video.duration);
+        const statusIcon = isCompleted ? '✓' : '○';
+
+        // Show full filename (video.file) in tooltip, display clean title
+        const tooltipText = video.file || video.title;
+
+        return `
+            <div class="video-item ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}"
+                 data-video-path="${this.escapeHtml(video.path)}"
+                 title="${this.escapeHtml(tooltipText)}">
+                <span class="video-status">${statusIcon}</span>
+                <div class="video-info">
+                    <div class="video-title">${this.escapeHtml(video.title)}</div>
+                    <div class="video-duration">${duration}</div>
+                </div>
+            </div>
+        `;
+    },
+
+    /**
+     * Attach event listeners to playlist items
+     */
+    attachEventListeners() {
+        // Chapter headers
+        this.container.querySelectorAll('.chapter-header').forEach(header => {
+            header.addEventListener('click', () => {
+                const chapterId = header.dataset.chapter;
+                this.toggleChapter(chapterId);
+            });
+        });
+
+        // Video items
+        this.container.querySelectorAll('.video-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const videoPath = item.dataset.videoPath;
+                const video = this.allVideos.find(v => v.path === videoPath);
+                if (video) {
+                    App.playVideo(video);
+                }
+            });
+        });
+    },
+
+    /**
+     * Toggle chapter expansion
+     * @param {string} chapterId - Chapter ID
+     */
+    toggleChapter(chapterId) {
+        const header = this.container.querySelector(`[data-chapter="${chapterId}"]`);
+        const content = this.container.querySelector(`[data-chapter-content="${chapterId}"]`);
+        const toggle = header?.querySelector('.chapter-toggle');
+
+        if (!header || !content) return;
+
+        if (this.expandedChapters.has(chapterId)) {
+            this.expandedChapters.delete(chapterId);
+            header.classList.remove('expanded');
+            content.classList.remove('expanded');
+            toggle?.classList.remove('expanded');
+        } else {
+            this.expandedChapters.add(chapterId);
+            header.classList.add('expanded');
+            content.classList.add('expanded');
+            toggle?.classList.add('expanded');
+        }
+    },
+
+    /**
+     * Expand chapter containing a video
+     * @param {Object} video - Video object
+     */
+    expandToVideo(video) {
+        if (!video.chapterObj) return;
+
+        // Find and expand parent chapters
+        const chapterId = this.getChapterId(video.chapterObj);
+        if (!this.expandedChapters.has(chapterId)) {
+            this.toggleChapter(chapterId);
+        }
+    },
+
+    /**
+     * Collapse all chapters
+     */
+    collapseAll() {
+        this.expandedChapters.clear();
+        this.render();
+    },
+
+    /**
+     * Update active video highlighting
+     * @param {Object} video - Current video
+     */
+    setActiveVideo(video) {
+        // Remove previous active
+        this.container.querySelectorAll('.video-item.active').forEach(item => {
+            item.classList.remove('active');
+        });
+
+        // Add new active
+        if (video) {
+            const item = this.container.querySelector(`[data-video-path="${video.path}"]`);
+            if (item) {
+                item.classList.add('active');
+                // Scroll into view
+                item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+    },
+
+    /**
+     * Mark a video as completed in UI
+     * @param {string} videoPath - Video path
+     */
+    markVideoCompleted(videoPath) {
+        const item = this.container.querySelector(`[data-video-path="${videoPath}"]`);
+        if (item) {
+            item.classList.add('completed');
+            item.querySelector('.video-status').textContent = '✓';
+        }
+
+        // Update chapter progress bars
+        this.updateChapterProgress();
+    },
+
+    /**
+     * Update all chapter progress bars
+     */
+    updateChapterProgress() {
+        this.container.querySelectorAll('.playlist-chapter').forEach(chapterEl => {
+            const chapterId = chapterEl.dataset.chapterId;
+            // Find chapter in data
+            const chapter = this.findChapterById(chapterId);
+            if (chapter) {
+                const completion = this.getChapterCompletion(chapter);
+                const bar = chapterEl.querySelector('.chapter-progress-bar');
+                if (bar) {
+                    bar.style.width = `${completion}%`;
+                }
+            }
+        });
+    },
+
+    /**
+     * Get chapter completion percentage
+     * @param {Object} chapter - Chapter object
+     * @returns {number} - Completion percentage
+     */
+    getChapterCompletion(chapter) {
+        const videos = [];
+
+        // Collect all videos in chapter (including sub-chapters)
+        const collectVideos = (ch) => {
+            if (ch.videos) {
+                videos.push(...ch.videos);
+            }
+            if (ch.children) {
+                for (const child of ch.children) {
+                    collectVideos(child);
+                }
+            }
+        };
+
+        collectVideos(chapter);
+        return Progress.calculateCompletion(videos);
+    },
+
+    /**
+     * Find chapter by ID
+     * @param {string} chapterId - Chapter ID
+     * @returns {Object|null} - Chapter object
+     */
+    findChapterById(chapterId) {
+        const find = (chapters) => {
+            for (const ch of chapters) {
+                if (this.getChapterId(ch) === chapterId) {
+                    return ch;
+                }
+                if (ch.children) {
+                    const found = find(ch.children);
+                    if (found) return found;
+                }
+            }
+            return null;
+        };
+
+        return this.playlist?.chapters ? find(this.playlist.chapters) : null;
+    },
+
+    /**
+     * Generate unique ID for a chapter
+     * @param {Object} chapter - Chapter object
+     * @returns {string} - Unique ID
+     */
+    getChapterId(chapter) {
+        return chapter.path || chapter.title;
+    },
+
+    /**
+     * Get next video in playlist
+     * @param {Object} currentVideo - Current video
+     * @returns {Object|null} - Next video or null
+     */
+    getNextVideo(currentVideo) {
+        if (!currentVideo) return this.allVideos[0] || null;
+
+        const index = this.allVideos.findIndex(v => v.path === currentVideo.path);
+        if (index >= 0 && index < this.allVideos.length - 1) {
+            return this.allVideos[index + 1];
+        }
+        return null;
+    },
+
+    /**
+     * Get previous video in playlist
+     * @param {Object} currentVideo - Current video
+     * @returns {Object|null} - Previous video or null
+     */
+    getPreviousVideo(currentVideo) {
+        if (!currentVideo) return null;
+
+        const index = this.allVideos.findIndex(v => v.path === currentVideo.path);
+        if (index > 0) {
+            return this.allVideos[index - 1];
+        }
+        return null;
+    },
+
+    /**
+     * Get video by path
+     * @param {string} path - Video path
+     * @returns {Object|null} - Video object
+     */
+    getVideoByPath(path) {
+        return this.allVideos.find(v => v.path === path) || null;
+    },
+
+    /**
+     * Format duration in seconds to human readable
+     * @param {number} seconds - Duration in seconds
+     * @returns {string} - Formatted duration
+     */
+    formatDuration(seconds) {
+        if (!seconds || seconds === 0) return '--:--';
+
+        const hours = Math.floor(seconds / 3600);
+        const mins = Math.floor((seconds % 3600) / 60);
+        const secs = Math.floor(seconds % 60);
+
+        if (hours > 0) {
+            return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    },
+
+    /**
+     * Escape HTML special characters
+     * @param {string} text - Raw text
+     * @returns {string} - Escaped text
+     */
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+};
+
+// Export for use in other modules
+window.Playlist = Playlist;
