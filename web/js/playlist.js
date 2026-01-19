@@ -220,7 +220,8 @@ const Playlist = {
     attachEventListeners() {
         // Chapter headers
         this.container.querySelectorAll('.chapter-header').forEach(header => {
-            header.addEventListener('click', () => {
+            header.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent parent chapters from toggling
                 const chapterId = header.dataset.chapter;
                 this.toggleChapter(chapterId);
             });
@@ -228,7 +229,8 @@ const Playlist = {
 
         // Video items
         this.container.querySelectorAll('.video-item').forEach(item => {
-            item.addEventListener('click', () => {
+            item.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent chapter toggle
                 const videoPath = decodeURIComponent(item.dataset.videoPath);
                 const video = this.allVideos.find(v => v.path === videoPath);
                 if (video) {
