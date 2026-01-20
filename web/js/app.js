@@ -18,6 +18,7 @@ const App = {
     documentsPanel: null,
     sidebarToggle: null,
     docsToggle: null,
+    sidebarBackdrop: null,
 
     // State
     state: {
@@ -49,6 +50,7 @@ const App = {
         this.documentsPanel = document.getElementById('documents-panel');
         this.sidebarToggle = document.getElementById('sidebar-toggle');
         this.docsToggle = document.getElementById('docs-toggle');
+        this.sidebarBackdrop = document.getElementById('sidebar-backdrop');
 
         // Initialize modules
         Modal.init();
@@ -56,6 +58,11 @@ const App = {
         Player.init();
         this.initSidebarResize();
         this.initPanelToggles();
+
+        // Start with sidebar collapsed on mobile
+        if (this.isMobile()) {
+            this.sidebar.classList.add('collapsed');
+        }
 
         // Load playlist data
         try {
@@ -431,21 +438,41 @@ const App = {
     initPanelToggles() {
         const btnHideSidebar = document.getElementById('btn-hide-sidebar');
         const btnHideDocs = document.getElementById('btn-hide-docs');
+        const btnHamburger = document.getElementById('btn-hamburger');
 
         // Sidebar toggle
         btnHideSidebar?.addEventListener('click', () => this.toggleSidebar(false));
         this.sidebarToggle?.addEventListener('click', () => this.toggleSidebar(true));
 
+        // Hamburger menu toggle (mobile)
+        btnHamburger?.addEventListener('click', () => {
+            const isOpen = !this.sidebar.classList.contains('collapsed');
+            this.toggleSidebar(!isOpen);
+        });
+
+        // Mobile backdrop click to close sidebar
+        this.sidebarBackdrop?.addEventListener('click', () => this.toggleSidebar(false));
+
         // Documents toggle
         btnHideDocs?.addEventListener('click', () => this.toggleDocuments(false));
         this.docsToggle?.addEventListener('click', () => this.toggleDocuments(true));
 
-        // Restore saved state
-        const sidebarHidden = localStorage.getItem('video_player:sidebar_hidden') === 'true';
-        const docsHidden = localStorage.getItem('video_player:docs_hidden') === 'true';
+        // Restore saved state (desktop only)
+        if (!this.isMobile()) {
+            const sidebarHidden = localStorage.getItem('video_player:sidebar_hidden') === 'true';
+            const docsHidden = localStorage.getItem('video_player:docs_hidden') === 'true';
 
-        if (sidebarHidden) this.toggleSidebar(false, true);
-        if (docsHidden) this.toggleDocuments(false, true);
+            if (sidebarHidden) this.toggleSidebar(false, true);
+            if (docsHidden) this.toggleDocuments(false, true);
+        }
+    },
+
+    /**
+     * Check if device is mobile
+     * @returns {boolean}
+     */
+    isMobile() {
+        return window.innerWidth <= 768;
     },
 
     /**
@@ -457,12 +484,18 @@ const App = {
         if (show) {
             this.sidebar.classList.remove('collapsed');
             this.sidebarToggle.classList.add('hidden');
+            // Show backdrop on mobile
+            if (this.isMobile()) {
+                this.sidebarBackdrop?.classList.add('show');
+            }
         } else {
             this.sidebar.classList.add('collapsed');
             this.sidebarToggle.classList.remove('hidden');
+            // Hide backdrop
+            this.sidebarBackdrop?.classList.remove('show');
         }
 
-        if (!skipSave) {
+        if (!skipSave && !this.isMobile()) {
             localStorage.setItem('video_player:sidebar_hidden', !show);
         }
     },

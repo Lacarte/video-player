@@ -20,6 +20,13 @@
         <!-- Header -->
         <header class="app-header">
             <div class="header-left">
+                <button class="btn-hamburger" id="btn-hamburger" title="Toggle Playlist">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                </button>
                 <h1 id="course-title">Video Player</h1>
                 <span class="header-badge" id="port-badge">Port: --</span>
             </div>
@@ -50,6 +57,9 @@
                     <line x1="9" y1="3" x2="9" y2="21"></line>
                 </svg>
             </button>
+
+            <!-- Mobile Sidebar Backdrop -->
+            <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
 
             <!-- Sidebar: Playlist -->
             <aside class="sidebar" id="sidebar">

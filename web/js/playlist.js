@@ -318,6 +318,10 @@ const Playlist = {
                 const video = this.allVideos.find(v => v.path === videoPath);
                 if (video) {
                     App.playVideo(video);
+                    // Auto-close sidebar on mobile
+                    if (App.isMobile()) {
+                        App.toggleSidebar(false);
+                    }
                 }
             });
         });

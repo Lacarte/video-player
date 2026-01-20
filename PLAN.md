@@ -247,3 +247,6 @@ To uninstall: Run `uninstall.bat` as administrator
 | Jump to current | Button to locate current video in playlist, opens sidebar | ✅ Done |
 | Video format support | Added .ts, .mts, .m2ts, .mov with MIME types | ✅ Done |
 | Unsupported format handling | Show error message and auto-skip to next video | ✅ Done |
+
+
+netsh advfirewall firewall add rule name="Video Player" dir=in action=allow protocol=TCP localport=8002-8020
