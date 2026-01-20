@@ -25,7 +25,7 @@ from .ordering import sort_items, extract_sort_key, get_clean_title
 
 
 # File extensions
-VIDEO_EXTENSIONS = {'.mp4', '.mkv', '.webm', '.avi', '.mov', '.m4v'}
+VIDEO_EXTENSIONS = {'.mp4', '.mkv', '.webm', '.avi', '.mov', '.m4v', '.ts', '.mts', '.m2ts'}
 SUBTITLE_EXTENSIONS = {'.srt', '.vtt'}
 IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'}
 DOCUMENT_EXTENSIONS = {'.pdf', '.txt', '.json', '.zip', '.rar', '.7z', '.md', '.html', '.htm', '.docx'}
@@ -261,8 +261,10 @@ def scan_folder(
                 sub_file = file_path.parent / sub.file
                 sub.path = build_url_path(sub_file, root_path)
 
+            # Use filename without extension as title (preserve numbering for sorting)
+            title = re.sub(r'\.[^.]+$', '', file_path.name)
             video = Video(
-                title=get_clean_title(file_path.name),
+                title=title,
                 file=file_path.name,
                 path=build_url_path(file_path, root_path),
                 order=order,

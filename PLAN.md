@@ -234,3 +234,16 @@ Supports:
 5. Progress saved automatically
 
 To uninstall: Run `uninstall.bat` as administrator
+
+---
+
+## Future Enhancements / TODO
+
+| Feature | Description | Status |
+|---------|-------------|--------|
+| TS format support | Add HLS.js for browser playback of .ts/.mts/.m2ts files | ⏳ Pending |
+| Auto-play first video | Play first video on initial load, resume on return | ✅ Done |
+| Improved sorting | Group items by prefix (e.g., "A roadmap_mes" together) | ✅ Done |
+| Jump to current | Button to locate current video in playlist, opens sidebar | ✅ Done |
+| Video format support | Added .ts, .mts, .m2ts, .mov with MIME types | ✅ Done |
+| Unsupported format handling | Show error message and auto-skip to next video | ✅ Done |

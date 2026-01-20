@@ -31,6 +31,10 @@ MAX_PORT = 8020
 mimetypes.add_type('video/mp4', '.mp4')
 mimetypes.add_type('video/webm', '.webm')
 mimetypes.add_type('video/x-matroska', '.mkv')
+mimetypes.add_type('video/mp2t', '.ts')
+mimetypes.add_type('video/mp2t', '.mts')
+mimetypes.add_type('video/mp2t', '.m2ts')
+mimetypes.add_type('video/quicktime', '.mov')
 mimetypes.add_type('text/vtt', '.vtt')
 mimetypes.add_type('application/x-subrip', '.srt')
 
@@ -407,6 +411,16 @@ def main():
     VideoPlayerHandler.course_path = course_path
     VideoPlayerHandler.port = port
 
+    # Get local IP for LAN access
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+    except Exception:
+        local_ip = "127.0.0.1"
+
     # Start server
     print()
     print("=" * 50)
@@ -414,7 +428,8 @@ def main():
     print("=" * 50)
     print(f"  Port:   {port}")
     print(f"  Course: {course_path}")
-    print(f"  URL:    http://localhost:{port}")
+    print(f"  Local:  http://localhost:{port}")
+    print(f"  LAN:    http://{local_ip}:{port}")
     print("=" * 50)
     print()
 

@@ -290,9 +290,30 @@ const Player = {
      */
     onError(e) {
         console.error('Video error:', e);
+
+        // Get file extension
+        const ext = this.currentVideo?.path?.split('.').pop()?.toLowerCase() || '';
+        const unsupportedFormats = ['ts', 'mts', 'm2ts'];
+
+        let message = 'Error loading video';
+        if (unsupportedFormats.includes(ext)) {
+            message = `Format .${ext} not supported by browser`;
+        }
+
         this.overlay.classList.remove('hidden');
-        this.overlay.querySelector('.overlay-text').textContent = 'Error loading video';
-        App.showToast('Failed to load video', 'error');
+        this.overlay.querySelector('.overlay-text').textContent = message;
+        App.showToast(message, 'error');
+
+        // Auto-skip to next video after 2 seconds if format not supported
+        if (unsupportedFormats.includes(ext)) {
+            setTimeout(() => {
+                const nextVideo = Playlist.getNextVideo(this.currentVideo);
+                if (nextVideo) {
+                    App.showToast('Skipping to next video...', 'info');
+                    App.playVideo(nextVideo);
+                }
+            }, 2000);
+        }
     },
 
     /**

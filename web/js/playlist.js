@@ -77,14 +77,10 @@ const Playlist = {
     flattenVideos(data) {
         const videos = [];
 
-        // Root level videos
-        if (data.videos) {
-            for (const video of data.videos) {
-                videos.push({ ...video, chapter: null });
-            }
-        }
+        // Helper to extract leading number for sorting
+        const getLeadingNum = (title) => parseInt(title.match(/^(\d+)/)?.[1]) || 999999;
 
-        // Chapter videos (recursive)
+        // Process chapter videos recursively
         const processChapter = (chapter, parentPath = '') => {
             const chapterPath = parentPath ? `${parentPath}/${chapter.title}` : chapter.title;
 
@@ -101,9 +97,22 @@ const Playlist = {
             }
         };
 
-        if (data.chapters) {
-            for (const chapter of data.chapters) {
-                processChapter(chapter);
+        // Combine root videos and chapters, sort by leading number (same as render)
+        const rootVideos = (data.videos || []).map(v => ({ type: 'video', item: v, title: v.title }));
+        const chapters = (data.chapters || []).map(c => ({ type: 'chapter', item: c, title: c.title }));
+        const combined = [...rootVideos, ...chapters].sort((a, b) => {
+            const numA = getLeadingNum(a.title);
+            const numB = getLeadingNum(b.title);
+            if (numA !== numB) return numA - numB;
+            return a.title.localeCompare(b.title);
+        });
+
+        // Process in sorted order
+        for (const entry of combined) {
+            if (entry.type === 'video') {
+                videos.push({ ...entry.item, chapter: null });
+            } else {
+                processChapter(entry.item);
             }
         }
 
