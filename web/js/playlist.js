@@ -77,9 +77,6 @@ const Playlist = {
     flattenVideos(data) {
         const videos = [];
 
-        // Helper to extract leading number for sorting
-        const getLeadingNum = (title) => parseInt(title.match(/^(\d+)/)?.[1]) || 999999;
-
         // Process chapter videos recursively
         const processChapter = (chapter, parentPath = '') => {
             const chapterPath = parentPath ? `${parentPath}/${chapter.title}` : chapter.title;
@@ -97,23 +94,12 @@ const Playlist = {
             }
         };
 
-        // Combine root videos and chapters, sort by leading number (same as render)
-        const rootVideos = (data.videos || []).map(v => ({ type: 'video', item: v, title: v.title }));
-        const chapters = (data.chapters || []).map(c => ({ type: 'chapter', item: c, title: c.title }));
-        const combined = [...rootVideos, ...chapters].sort((a, b) => {
-            const numA = getLeadingNum(a.title);
-            const numB = getLeadingNum(b.title);
-            if (numA !== numB) return numA - numB;
-            return a.title.localeCompare(b.title);
-        });
-
-        // Process in sorted order
-        for (const entry of combined) {
-            if (entry.type === 'video') {
-                videos.push({ ...entry.item, chapter: null });
-            } else {
-                processChapter(entry.item);
-            }
+        // Use backend order — root videos first, then chapters
+        for (const video of (data.videos || [])) {
+            videos.push({ ...video, chapter: null });
+        }
+        for (const chapter of (data.chapters || [])) {
+            processChapter(chapter);
         }
 
         return videos;
@@ -127,24 +113,12 @@ const Playlist = {
 
         let html = '';
 
-        // Combine root videos and chapters, then sort by title using natural sort
-        const rootVideos = (this.playlist.videos || []).map(v => ({ type: 'video', item: v, title: v.title }));
-        const chapters = (this.playlist.chapters || []).map(c => ({ type: 'chapter', item: c, title: c.title }));
-        const combined = [...rootVideos, ...chapters].sort((a, b) => {
-            // Natural sort: extract leading number if present
-            const numA = parseInt(a.title.match(/^(\d+)/)?.[1]) || 999999;
-            const numB = parseInt(b.title.match(/^(\d+)/)?.[1]) || 999999;
-            if (numA !== numB) return numA - numB;
-            return a.title.localeCompare(b.title);
-        });
-
-        // Render items in order
-        for (const entry of combined) {
-            if (entry.type === 'video') {
-                html += this.renderVideoItem(entry.item);
-            } else {
-                html += this.renderChapter(entry.item);
-            }
+        // Render in backend order — root videos first, then chapters
+        for (const video of (this.playlist.videos || [])) {
+            html += this.renderVideoItem(video);
+        }
+        for (const chapter of (this.playlist.chapters || [])) {
+            html += this.renderChapter(chapter);
         }
 
         this.container.innerHTML = html;
