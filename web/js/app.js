@@ -70,6 +70,9 @@ const App = {
             this.hideLoading();
             this.resumeLastVideo();
 
+            // Poll for background video conversion status
+            this.pollConversionStatus();
+
             // Check if we need to calculate durations
             this.checkAndCalculateDurations();
         } catch (e) {
@@ -636,6 +639,140 @@ const App = {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    },
+
+    /**
+     * Poll for background video conversion status and show banner
+     */
+    pollConversionStatus() {
+        const dialog = document.getElementById('convert-dialog');
+        const dialogTitle = document.getElementById('convert-dialog-title');
+        const dialogDesc = document.getElementById('convert-dialog-desc');
+        const dialogList = document.getElementById('convert-dialog-list');
+        const dialogFooter = document.getElementById('convert-dialog-footer');
+        const convertAllBtn = document.getElementById('convert-all-btn');
+        const skipBtn = document.getElementById('convert-skip-btn');
+        const progressSection = document.getElementById('convert-progress-section');
+        const progressCurrent = document.getElementById('convert-progress-current');
+        const progressFill = document.getElementById('conversion-progress-fill');
+        const progressStats = document.getElementById('convert-progress-stats');
+        const warning = document.getElementById('conversion-warning');
+        const warningText = document.getElementById('conversion-warning-text');
+        const convertNowBtn = document.getElementById('convert-now-btn');
+
+        if (!dialog) return;
+
+        let fileList = [];
+
+        const showDialog = (files) => {
+            fileList = files;
+            dialogTitle.textContent = 'Incompatible Videos Found';
+            dialogDesc.textContent = 'The following videos need format conversion for browser playback:';
+            dialogList.classList.remove('hidden');
+            dialogFooter.classList.remove('hidden');
+            progressSection.classList.add('hidden');
+
+            dialogList.innerHTML = files.map(f => {
+                const badge = f.mode === 'remux'
+                    ? '<span class="convert-badge convert-badge-fast">remux</span>'
+                    : '<span class="convert-badge convert-badge-slow">transcode</span>';
+                return `<div class="convert-file-item">
+                    <span class="convert-file-name">${this.escapeHtml(f.name)}</span>
+                    <span class="convert-file-meta">${f.size_mb} MB ${badge}</span>
+                </div>`;
+            }).join('');
+
+            dialog.classList.remove('hidden');
+        };
+
+        const showWarning = (count) => {
+            warningText.textContent = `${count} video(s) need conversion for browser playback`;
+            warning.classList.remove('hidden');
+        };
+
+        const switchToProgress = () => {
+            dialogTitle.textContent = 'Converting Videos';
+            dialogDesc.textContent = '';
+            dialogList.classList.add('hidden');
+            dialogFooter.classList.add('hidden');
+            progressSection.classList.remove('hidden');
+            progressFill.style.width = '0%';
+            progressCurrent.textContent = 'Starting...';
+            progressStats.textContent = '';
+            dialog.classList.remove('hidden');
+            warning.classList.add('hidden');
+        };
+
+        const startConversion = async () => {
+            switchToProgress();
+            try {
+                await fetch('/api/convert', { method: 'POST' });
+                pollConverting();
+            } catch (e) {
+                this.showToast('Failed to start conversion', 'error');
+            }
+        };
+
+        const pollConverting = () => {
+            const tick = async () => {
+                try {
+                    const res = await fetch('/api/conversion-status');
+                    if (!res.ok) return;
+                    const s = await res.json();
+
+                    if (s.phase === 'converting') {
+                        progressCurrent.textContent = `${s.current_index}/${s.total}: ${s.current_file}`;
+                        const overall = ((s.done_count + s.failed_count + s.percent / 100) / s.total) * 100;
+                        progressFill.style.width = Math.min(100, overall).toFixed(1) + '%';
+                        progressStats.textContent = `${s.done_count} done${s.failed_count ? ', ' + s.failed_count + ' failed' : ''}`;
+                        setTimeout(tick, 1000);
+                    } else if (s.phase === 'done') {
+                        progressCurrent.textContent = 'All done!';
+                        progressFill.style.width = '100%';
+                        const summary = `${s.done_count} converted${s.failed_count ? ', ' + s.failed_count + ' failed' : ''}`;
+                        progressStats.textContent = summary;
+                        // Auto-close dialog after a moment
+                        setTimeout(() => { dialog.classList.add('hidden'); }, 3000);
+                    } else {
+                        setTimeout(tick, 1000);
+                    }
+                } catch (e) {
+                    setTimeout(tick, 2000);
+                }
+            };
+            tick();
+        };
+
+        // Button handlers
+        convertAllBtn.addEventListener('click', startConversion);
+        convertNowBtn.addEventListener('click', startConversion);
+        skipBtn.addEventListener('click', () => {
+            dialog.classList.add('hidden');
+            showWarning(fileList.length);
+        });
+
+        // Initial poll: wait for scan to finish
+        const poll = async () => {
+            try {
+                const res = await fetch('/api/conversion-status');
+                if (!res.ok) { setTimeout(poll, 1000); return; }
+                const s = await res.json();
+
+                if (s.phase === 'scanning') {
+                    setTimeout(poll, 1000);
+                } else if (s.phase === 'waiting') {
+                    showDialog(s.files);
+                } else if (s.phase === 'converting') {
+                    switchToProgress();
+                    pollConverting();
+                }
+                // 'done' or '' → no action needed
+            } catch (e) {
+                setTimeout(poll, 2000);
+            }
+        };
+
+        poll();
     }
 };
 

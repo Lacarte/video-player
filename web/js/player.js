@@ -96,12 +96,6 @@ const Player = {
         // Clear existing subtitles
         this.clearSubtitles();
 
-        // Switch to auto preload for faster buffering when user selects a video
-        this.video.preload = 'auto';
-
-        // Set video source
-        this.video.src = video.path;
-
         // Update UI
         this.nowPlayingTitle.textContent = video.title;
 
@@ -112,12 +106,28 @@ const Player = {
             this.subtitleGroup.style.display = 'none';
         }
 
+        // Load video directly (incompatible formats are converted at server startup)
+        this.loadVideoSource(video);
+
+        // Update navigation buttons
+        this.updateNavButtons();
+    },
+
+    /**
+     * Load video source and start playback
+     * @param {Object} video - Video object
+     */
+    loadVideoSource(video) {
+        // Switch to auto preload for faster buffering
+        this.video.preload = 'auto';
+
+        // Set video source
+        this.video.src = video.path;
+
         // Restore progress and hide overlay when ready
         const savedProgress = Progress.getVideoProgress(video.path);
         const onCanPlay = () => {
-            // Hide loading overlay
             this.overlay.classList.add('hidden');
-            // Restore position if saved
             if (savedProgress > 0) {
                 this.video.currentTime = savedProgress;
             }
@@ -125,15 +135,21 @@ const Player = {
         };
         this.video.addEventListener('canplay', onCanPlay);
 
-        // Start playing
+        // Start playing (handle autoplay policy)
         this.video.play().catch(e => {
-            console.log('Autoplay prevented:', e);
-            // Still hide overlay even if autoplay blocked
-            this.overlay.classList.add('hidden');
+            if (e.name === 'NotAllowedError') {
+                this.overlay.classList.remove('hidden');
+                this.overlay.querySelector('.overlay-text').textContent = 'Click to play';
+                this.overlay.onclick = () => {
+                    this.overlay.onclick = null;
+                    this.overlay.classList.add('hidden');
+                    this.video.play().catch(() => {});
+                };
+            } else {
+                console.log('Play error:', e);
+                this.overlay.classList.add('hidden');
+            }
         });
-
-        // Update navigation buttons
-        this.updateNavButtons();
 
         // Preload next video in background
         this.preloadNextVideo();
@@ -289,11 +305,16 @@ const Player = {
      * @param {Event} e - Error event
      */
     onError(e) {
-        console.error('Video error:', e);
+        // Ignore errors when no video is loaded or source is empty
+        const mediaError = this.video.error;
+        if (!this.currentVideo || !this.video.src || this.video.src === window.location.href) {
+            return;
+        }
+        console.error('Video error:', mediaError?.code, mediaError?.message || e);
 
         // Get file extension
         const ext = this.currentVideo?.path?.split('.').pop()?.toLowerCase() || '';
-        const unsupportedFormats = ['ts', 'mts', 'm2ts'];
+        const unsupportedFormats = ['ts', 'mts', 'm2ts', 'mkv', 'avi'];
 
         let message = 'Error loading video';
         if (unsupportedFormats.includes(ext)) {

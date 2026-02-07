@@ -57,16 +57,20 @@ def extract_sort_key(name: str) -> Tuple[str, int, str]:
             # 'l' chosen because: a < l < m
             return ('l__numbered', num, rest.lower())
 
-    # Pattern 2: "Word Number" format (Módulo 1, Chapter 10, etc.)
-    # Must have a word followed by space and number
-    word_number_pattern = r'^(.+?)\s+(\d+)(.*)$'
-    match = re.match(word_number_pattern, base_name)
-    if match:
-        prefix = match.group(1).strip()
-        num = int(match.group(2))
-        suffix = match.group(3).strip()
-        # Prefix groups items together, then sort by number within prefix
-        return (prefix.lower(), num, suffix.lower())
+    # Pattern 2: "Word Number" format (Módulo 1, Chapter 10, F1, etc.)
+    # Matches with or without space between word and number
+    word_number_patterns = [
+        r'^(.+?)\s+(\d+)(.*)$',   # "Módulo 1", "Chapter 10"
+        r'^([a-zA-Z]+)(\d+)(.*)$', # "F1", "F10", "Lesson1"
+    ]
+    for pattern in word_number_patterns:
+        match = re.match(pattern, base_name)
+        if match:
+            prefix = match.group(1).strip()
+            num = int(match.group(2))
+            suffix = match.group(3).strip()
+            # Prefix groups items together, then sort by number within prefix
+            return (prefix.lower(), num, suffix.lower())
 
     # Pattern 3: Number at END with separator (requires: "_1", "-1", ".1")
     # Does NOT match: "lesson.mp4" (4 is part of extension)

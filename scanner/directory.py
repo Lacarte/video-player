@@ -31,7 +31,7 @@ IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'}
 DOCUMENT_EXTENSIONS = {'.pdf', '.txt', '.json', '.zip', '.rar', '.7z', '.md', '.html', '.htm', '.docx'}
 
 # Folders to ignore
-IGNORE_FOLDERS = {'.git', '__pycache__', 'node_modules', '.vscode', 'trash', 'deleteVideos', '.idea'}
+IGNORE_FOLDERS = {'.git', '__pycache__', 'node_modules', '.vscode', 'trash', 'deleteVideos', '.idea', '.transcoded'}
 
 
 def get_document_type(extension: str) -> DocumentType:
@@ -302,27 +302,7 @@ def scan_folder(
 
         has_videos = has_videos_recursive(sub_videos, sub_sub_chapters)
 
-        # Check if this is a "wrapper" folder: contains only 1 video and no child chapters
-        # These folders exist just to keep video + subtitles organized together
-        # Flatten them by promoting the video to the parent level
-        is_wrapper_folder = (
-            len(sub_videos) == 1 and
-            len(sub_sub_chapters) == 0
-        )
-
-        if is_wrapper_folder:
-            # Promote the single video to parent level
-            # The video already has its subtitles linked
-            # Use the folder's sort key for ordering so "0. Intro" folder sorts before "1. Basics"
-            # Also use the folder name as the video title (preserving numbering like "0. Introducción")
-            _, folder_sort_num, _ = extract_sort_key(folder.name)
-            for vid in sub_videos:
-                vid.order = folder_sort_num
-                vid.title = folder.name  # Use folder name as title to preserve numbering
-            videos.extend(sub_videos)
-            # Also promote any documents
-            documents.extend(sub_docs)
-        elif has_videos:
+        if has_videos:
             # Normal chapter with videos
             # Use full folder name to preserve numbering (e.g., "1. Generación de la Idea")
             # Extract order from folder name for proper sorting

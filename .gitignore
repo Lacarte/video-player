@@ -4,3 +4,9 @@ scanner/bin/
 COURSE/
 dir.txt
 reproduce_ordering.py
+nul
+.venv/
+.claude/
+logs/
+test_remux_output.mp4
+*.converting.mp4

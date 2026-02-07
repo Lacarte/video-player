@@ -29,13 +29,13 @@ REM Add registry entries for folder icon context menu (right-click on folder)
 echo Installing context menu entry for folder icons...
 reg add "HKCR\Directory\shell\PlayCourse" /ve /d "Play Course" /f >nul
 reg add "HKCR\Directory\shell\PlayCourse" /v "Icon" /d "%SystemRoot%\System32\shell32.dll,176" /f >nul
-reg add "HKCR\Directory\shell\PlayCourse\command" /ve /d "cmd.exe /c \"\"%SCRIPT_DIR%\runner.bat\" \"%%V\"\"" /f >nul
+reg add "HKCR\Directory\shell\PlayCourse\command" /ve /d "wscript.exe \"%SCRIPT_DIR%\runner.vbs\" \"%%V\"" /f >nul
 
 REM Add registry entries for folder background context menu (right-click inside folder)
 echo Installing context menu entry for folder background...
 reg add "HKCR\Directory\Background\shell\PlayCourse" /ve /d "Play Course" /f >nul
 reg add "HKCR\Directory\Background\shell\PlayCourse" /v "Icon" /d "%SystemRoot%\System32\shell32.dll,176" /f >nul
-reg add "HKCR\Directory\Background\shell\PlayCourse\command" /ve /d "cmd.exe /c \"\"%SCRIPT_DIR%\runner.bat\" \"%%V\"\"" /f >nul
+reg add "HKCR\Directory\Background\shell\PlayCourse\command" /ve /d "wscript.exe \"%SCRIPT_DIR%\runner.vbs\" \"%%V\"" /f >nul
 
 IF %ERRORLEVEL% EQU 0 (
     echo.

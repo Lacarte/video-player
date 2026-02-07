@@ -1,12 +1,10 @@
 @echo off
-SETLOCAL EnableDelayedExpansion
-
 REM ===================================
 REM Video Player Runner
 REM Supports multiple instances via dynamic port selection
 REM ===================================
 
-REM Configuration
+REM Configuration - get script dir BEFORE enabling delayed expansion
 SET "SCRIPT_DIR=%~dp0"
 SET "SCRIPT_DIR=%SCRIPT_DIR:~0,-1%"
 SET "BASE_PORT=8002"
@@ -14,19 +12,26 @@ SET "MAX_PORT=8020"
 
 REM ===================================
 REM Detect Target Directory
+REM Handle special characters like ! and ~ in paths
 REM ===================================
-SET "TARGET_DIR="
-IF NOT "%~1"=="" (
-    IF EXIST "%~1\." (
-        REM Context menu mode - %1 is the folder path
-        SET "TARGET_DIR=%~1"
-    )
+SET "TARGET_DIR=%~1"
+IF "%TARGET_DIR%"=="" SET "TARGET_DIR=%CD%"
+
+REM Verify path exists
+IF NOT EXIST "%TARGET_DIR%\." (
+    echo.
+    echo ===================================
+    echo   ERROR: Folder not found
+    echo ===================================
+    echo.
+    echo Path: %TARGET_DIR%
+    echo.
+    pause
+    exit /b 1
 )
 
-IF NOT DEFINED TARGET_DIR (
-    REM Manual mode - use current directory
-    SET "TARGET_DIR=%CD%"
-)
+REM Now enable delayed expansion for port finding
+SETLOCAL EnableDelayedExpansion
 
 REM ===================================
 REM Find Available Port
@@ -80,11 +85,38 @@ start "" "http://localhost:%PORT%"
 REM ===================================
 REM Start Server
 REM ===================================
-python "%SCRIPT_DIR%\server.py" --port %PORT% --path "%TARGET_DIR%"
+SET "VENV_PYTHON=%SCRIPT_DIR%\.venv\Scripts\python.exe"
+
+echo.
+echo Script dir: %SCRIPT_DIR%
+echo.
+
+REM Use .venv if it exists, otherwise use system python
+IF EXIST "%VENV_PYTHON%" (
+    echo Using virtual environment: %VENV_PYTHON%
+    echo.
+    "%VENV_PYTHON%" "%SCRIPT_DIR%\server.py" --port %PORT% --path "%TARGET_DIR%"
+) ELSE (
+    echo Virtual environment not found at: %VENV_PYTHON%
+    echo Using system Python...
+    echo.
+    python "%SCRIPT_DIR%\server.py" --port %PORT% --path "%TARGET_DIR%"
+)
 
 REM ===================================
-REM Server Stopped
+REM Server Stopped or Error
 REM ===================================
+IF %ERRORLEVEL% NEQ 0 (
+    echo.
+    echo ===================================
+    echo   ERROR: Server failed to start
+    echo   Error code: %ERRORLEVEL%
+    echo ===================================
+    echo.
+    pause
+    exit /b %ERRORLEVEL%
+)
+
 echo.
 echo Server stopped.
 echo.

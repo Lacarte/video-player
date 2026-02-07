@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Video Player</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <link rel="stylesheet" href="/static/player.css">
 </head>
 <body>
@@ -13,6 +14,38 @@
             <div class="loading-spinner"></div>
             <div class="loading-text">Loading course...</div>
         </div>
+    </div>
+
+    <!-- Incompatible Videos Dialog (also shows conversion progress) -->
+    <div id="convert-dialog" class="convert-dialog hidden">
+        <div class="convert-dialog-backdrop"></div>
+        <div class="convert-dialog-content">
+            <div class="convert-dialog-header">
+                <h3 id="convert-dialog-title">Incompatible Videos Found</h3>
+            </div>
+            <div class="convert-dialog-body">
+                <p class="convert-dialog-desc" id="convert-dialog-desc">The following videos need format conversion for browser playback:</p>
+                <div class="convert-dialog-list" id="convert-dialog-list"></div>
+                <!-- Progress section (hidden until converting) -->
+                <div class="convert-progress-section hidden" id="convert-progress-section">
+                    <div class="convert-progress-current" id="convert-progress-current"></div>
+                    <div class="conversion-progress-bar">
+                        <div class="conversion-progress-fill" id="conversion-progress-fill"></div>
+                    </div>
+                    <div class="convert-progress-stats" id="convert-progress-stats"></div>
+                </div>
+            </div>
+            <div class="convert-dialog-footer" id="convert-dialog-footer">
+                <button class="btn btn-secondary" id="convert-skip-btn">Skip</button>
+                <button class="btn btn-primary" id="convert-all-btn">Convert All</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Warning Banner (when conversion skipped) -->
+    <div id="conversion-warning" class="conversion-warning hidden">
+        <span id="conversion-warning-text"></span>
+        <button class="btn btn-primary btn-sm" id="convert-now-btn">Convert Now</button>
     </div>
 
     <!-- Main App -->
