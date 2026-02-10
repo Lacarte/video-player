@@ -42,6 +42,34 @@
         </div>
     </div>
 
+    <!-- SRT to VTT Conversion Dialog -->
+    <div id="subtitle-convert-dialog" class="convert-dialog hidden">
+        <div class="convert-dialog-backdrop"></div>
+        <div class="convert-dialog-content">
+            <div class="convert-dialog-header">
+                <h3 id="subtitle-convert-title">SRT Subtitles Found</h3>
+            </div>
+            <div class="convert-dialog-body">
+                <p class="convert-dialog-desc" id="subtitle-convert-desc">
+                    The following SRT subtitle files should be converted to VTT format for better browser compatibility:
+                </p>
+                <div class="convert-dialog-list" id="subtitle-convert-list"></div>
+                <!-- Progress section (hidden until converting) -->
+                <div class="convert-progress-section hidden" id="subtitle-progress-section">
+                    <div class="convert-progress-current" id="subtitle-progress-current"></div>
+                    <div class="conversion-progress-bar">
+                        <div class="conversion-progress-fill" id="subtitle-progress-fill"></div>
+                    </div>
+                    <div class="convert-progress-stats" id="subtitle-progress-stats"></div>
+                </div>
+            </div>
+            <div class="convert-dialog-footer" id="subtitle-convert-footer">
+                <button class="btn btn-secondary" id="subtitle-skip-btn">Skip</button>
+                <button class="btn btn-primary" id="subtitle-convert-btn">Convert to VTT</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Warning Banner (when conversion skipped) -->
     <div id="conversion-warning" class="conversion-warning hidden">
         <span id="conversion-warning-text"></span>

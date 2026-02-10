@@ -151,6 +151,9 @@ def find_subtitles(video_path: Path, all_files: List[Path]) -> List[Subtitle]:
     # If only one video in folder, link ALL subtitles in that folder
     is_single_video_folder = len(dir_videos) == 1
 
+    # Collect potential subtitle files (will deduplicate later)
+    potential_subtitles = []
+
     for file_path in dir_subtitles:
         sub_stem = file_path.stem.lower()
 
@@ -188,12 +191,35 @@ def find_subtitles(video_path: Path, all_files: List[Path]) -> List[Subtitle]:
                     lang = remainder[:2]
                     label = remainder.capitalize()
 
-        subtitles.append(Subtitle(
-            lang=lang,
-            label=label,
-            file=file_path.name,
-            path=""
+        potential_subtitles.append((
+            file_path,
+            Subtitle(
+                lang=lang,
+                label=label,
+                file=file_path.name,
+                path=""
+            )
         ))
+
+    # Deduplicate: prefer VTT over SRT when both exist
+    # Group by (stem, lang) and keep only VTT if both formats exist
+    subtitle_map = {}
+    for file_path, subtitle in potential_subtitles:
+        key = (file_path.stem.lower(), subtitle.lang)
+
+        if key not in subtitle_map:
+            subtitle_map[key] = (file_path, subtitle)
+        else:
+            # If we already have this subtitle, prefer VTT over SRT
+            existing_path, existing_sub = subtitle_map[key]
+            if file_path.suffix.lower() == '.vtt' and existing_path.suffix.lower() == '.srt':
+                # Replace SRT with VTT
+                subtitle_map[key] = (file_path, subtitle)
+            # If existing is already VTT, keep it; if both are same format, keep first
+
+    # Add deduplicated subtitles to result
+    for _, subtitle in subtitle_map.values():
+        subtitles.append(subtitle)
 
     return subtitles
 

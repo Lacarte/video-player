@@ -73,6 +73,13 @@ const App = {
             // Poll for background video conversion status
             this.pollConversionStatus();
 
+            // Poll for subtitle conversion status
+            try {
+                this.pollSubtitleConversionStatus();
+            } catch (e) {
+                console.error('Subtitle polling error:', e);
+            }
+
             // Check if we need to calculate durations
             this.checkAndCalculateDurations();
         } catch (e) {
@@ -755,6 +762,128 @@ const App = {
         const poll = async () => {
             try {
                 const res = await fetch('/api/conversion-status');
+                if (!res.ok) { setTimeout(poll, 1000); return; }
+                const s = await res.json();
+
+                if (s.phase === 'scanning') {
+                    setTimeout(poll, 1000);
+                } else if (s.phase === 'waiting') {
+                    showDialog(s.files);
+                } else if (s.phase === 'converting') {
+                    switchToProgress();
+                    pollConverting();
+                }
+                // 'done' or '' → no action needed
+            } catch (e) {
+                setTimeout(poll, 2000);
+            }
+        };
+
+        poll();
+    },
+
+    pollSubtitleConversionStatus() {
+        const dialog = document.getElementById('subtitle-convert-dialog');
+        const dialogTitle = document.getElementById('subtitle-convert-title');
+        const dialogDesc = document.getElementById('subtitle-convert-desc');
+        const dialogList = document.getElementById('subtitle-convert-list');
+        const dialogFooter = document.getElementById('subtitle-convert-footer');
+        const convertBtn = document.getElementById('subtitle-convert-btn');
+        const skipBtn = document.getElementById('subtitle-skip-btn');
+        const progressSection = document.getElementById('subtitle-progress-section');
+        const progressCurrent = document.getElementById('subtitle-progress-current');
+        const progressFill = document.getElementById('subtitle-progress-fill');
+        const progressStats = document.getElementById('subtitle-progress-stats');
+
+        if (!dialog) {
+            console.log('Subtitle dialog not found, skipping subtitle polling');
+            return;
+        }
+
+        let fileList = [];
+
+        const showDialog = (files) => {
+            fileList = files;
+            dialogTitle.textContent = 'SRT Subtitles Found';
+            dialogDesc.textContent = 'The following SRT subtitle files should be converted to VTT format for better browser compatibility:';
+            dialogList.classList.remove('hidden');
+            dialogFooter.classList.remove('hidden');
+            progressSection.classList.add('hidden');
+
+            dialogList.innerHTML = files.map(f => {
+                return `<div class="convert-file-item">
+                    <span class="convert-file-name">${this.escapeHtml(f.name)}</span>
+                    <span class="convert-file-meta">${f.path_relative}</span>
+                </div>`;
+            }).join('');
+
+            dialog.classList.remove('hidden');
+        };
+
+        const switchToProgress = () => {
+            dialogTitle.textContent = 'Converting Subtitles';
+            dialogDesc.textContent = '';
+            dialogList.classList.add('hidden');
+            dialogFooter.classList.add('hidden');
+            progressSection.classList.remove('hidden');
+            progressFill.style.width = '0%';
+            progressCurrent.textContent = 'Starting...';
+            progressStats.textContent = '';
+            dialog.classList.remove('hidden');
+        };
+
+        const startConversion = async () => {
+            switchToProgress();
+            try {
+                await fetch('/api/convert-subtitles', { method: 'POST' });
+                pollConverting();
+            } catch (e) {
+                this.showToast('Failed to start subtitle conversion', 'error');
+            }
+        };
+
+        const pollConverting = () => {
+            const tick = async () => {
+                try {
+                    const res = await fetch('/api/subtitle-conversion-status');
+                    if (!res.ok) return;
+                    const s = await res.json();
+
+                    if (s.phase === 'converting') {
+                        progressCurrent.textContent = `${s.current_index}/${s.total}: ${s.current_file}`;
+                        const overall = ((s.done_count + s.failed_count + s.percent / 100) / s.total) * 100;
+                        progressFill.style.width = Math.min(100, overall).toFixed(1) + '%';
+                        progressStats.textContent = `${s.done_count} done${s.failed_count ? ', ' + s.failed_count + ' failed' : ''}`;
+                        setTimeout(tick, 1000);
+                    } else if (s.phase === 'done') {
+                        progressCurrent.textContent = 'All done! Refreshing page...';
+                        progressFill.style.width = '100%';
+                        const summary = `${s.done_count} converted${s.failed_count ? ', ' + s.failed_count + ' failed' : ''}`;
+                        progressStats.textContent = summary;
+                        // Auto-refresh page to reload subtitles
+                        setTimeout(() => {
+                            location.reload();
+                        }, 2000);
+                    } else {
+                        setTimeout(tick, 1000);
+                    }
+                } catch (e) {
+                    setTimeout(tick, 2000);
+                }
+            };
+            tick();
+        };
+
+        // Button handlers
+        convertBtn.addEventListener('click', startConversion);
+        skipBtn.addEventListener('click', () => {
+            dialog.classList.add('hidden');
+        });
+
+        // Initial poll: wait for scan to finish
+        const poll = async () => {
+            try {
+                const res = await fetch('/api/subtitle-conversion-status');
                 if (!res.ok) { setTimeout(poll, 1000); return; }
                 const s = await res.json();
 

@@ -92,6 +92,21 @@ _conversion_state = {
 _to_convert = []
 _course_path_for_convert = None
 
+# Subtitle conversion state
+_subtitle_conversion_state = {
+    'phase': '',           # 'scanning', 'waiting', 'converting', 'done'
+    'current_file': '',
+    'current_index': 0,
+    'total': 0,
+    'percent': 0,
+    'done_count': 0,
+    'failed_count': 0,
+    'files': [],           # list of {name, path_relative}
+}
+
+_srt_to_convert = []  # List of (srt_path, vtt_path) tuples
+_course_path_for_subtitle_convert = None
+
 
 def _probe_video(file_path: Path) -> dict:
     """Run ffprobe on a file and return parsed JSON, or empty dict on failure."""
@@ -480,6 +495,149 @@ def _convert_single_video(file_path: Path, mode: str, has_nvenc: bool) -> bool:
         return False
 
 
+# ── Subtitle conversion (SRT to VTT) ──────────────────────────────────
+
+def convert_srt_to_vtt(srt_path: Path) -> bool:
+    """Convert SRT subtitle file to VTT format.
+    Returns True on success, False on failure.
+    Preserves original SRT file.
+    """
+    try:
+        vtt_path = srt_path.with_suffix('.vtt')
+
+        # Read SRT file
+        with open(srt_path, 'r', encoding='utf-8', errors='ignore') as f:
+            srt_content = f.read()
+
+        # Convert SRT to VTT
+        # 1. Add WEBVTT header
+        vtt_content = "WEBVTT\n\n"
+
+        # 2. Replace comma with dot in timestamps: 00:00:10,500 -> 00:00:10.500
+        vtt_content += re.sub(r'(\d{2}:\d{2}:\d{2}),(\d{3})', r'\1.\2', srt_content)
+
+        # Write VTT file
+        with open(vtt_path, 'w', encoding='utf-8') as f:
+            f.write(vtt_content)
+
+        # Verify VTT file was created
+        if not vtt_path.exists() or vtt_path.stat().st_size == 0:
+            logger.error(f"VTT file creation failed: {vtt_path}")
+            return False
+
+        logger.info(f"Converted {srt_path.name} -> {vtt_path.name}")
+        return True
+
+    except Exception as e:
+        logger.exception(f"Error converting {srt_path.name}: {e}")
+        return False
+
+
+def scan_subtitles_on_startup(course_path: Path) -> None:
+    """Scan course directory for SRT files without corresponding VTT files.
+    Sets phase to 'waiting' with a file list if any are found.
+    Runs in a background thread so the server is immediately available.
+    """
+    global _srt_to_convert, _course_path_for_subtitle_convert
+    _course_path_for_subtitle_convert = course_path
+    _subtitle_conversion_state['phase'] = 'scanning'
+    logger.info("Scanning for SRT subtitles without VTT equivalents...")
+
+    # Collect all SRT files
+    srt_files = []
+    for root, dirs, files in os.walk(course_path):
+        dirs[:] = [d for d in dirs if d not in {'.git', '__pycache__', 'node_modules',
+                   '.vscode', 'trash', 'deleteVideos', '.idea', '.transcoded'}]
+        for f in files:
+            if f.lower().endswith('.srt'):
+                srt_files.append(Path(root) / f)
+
+    if not srt_files:
+        logger.info("No SRT files found.")
+        _subtitle_conversion_state['phase'] = 'done'
+        return
+
+    # Check which SRT files don't have corresponding VTT files
+    srt_without_vtt = []
+    total = len(srt_files)
+    _subtitle_conversion_state['total'] = total
+
+    for idx, srt_path in enumerate(srt_files):
+        pct = int((idx + 1) / total * 100)
+        _subtitle_conversion_state['current_index'] = idx + 1
+        _subtitle_conversion_state['percent'] = pct
+        bar = _progress_bar(pct)
+        print(f'\r  {bar} {pct:3d}% Checking {idx + 1}/{total} SRT files...', end='', flush=True)
+
+        vtt_path = srt_path.with_suffix('.vtt')
+        if not vtt_path.exists():
+            srt_without_vtt.append((srt_path, vtt_path))
+
+    print(f'\r  {_progress_bar(100)} 100% Checked {total} SRT files.          ', flush=True)
+
+    if not srt_without_vtt:
+        logger.info("All SRT files already have corresponding VTT files.")
+        _subtitle_conversion_state['phase'] = 'done'
+        return
+
+    # Store for later conversion
+    _srt_to_convert = srt_without_vtt
+
+    logger.info(f"Found {len(srt_without_vtt)} SRT file(s) without VTT equivalents")
+    logger.info("Waiting for user confirmation to convert...")
+
+    # Build file list for the frontend dialog
+    file_list = []
+    for srt_path, vtt_path in srt_without_vtt:
+        try:
+            path_relative = srt_path.relative_to(course_path)
+        except ValueError:
+            path_relative = srt_path
+        file_list.append({
+            'name': srt_path.name,
+            'path_relative': str(path_relative),
+        })
+
+    _subtitle_conversion_state['phase'] = 'waiting'
+    _subtitle_conversion_state['total'] = len(srt_without_vtt)
+    _subtitle_conversion_state['files'] = file_list
+
+
+def run_subtitle_conversion() -> None:
+    """Run the actual conversion of all SRT files to VTT.
+    Called from /api/convert-subtitles endpoint in a background thread.
+    """
+    global _srt_to_convert
+    if not _srt_to_convert:
+        return
+
+    _subtitle_conversion_state['phase'] = 'converting'
+    _subtitle_conversion_state['total'] = len(_srt_to_convert)
+    _subtitle_conversion_state['done_count'] = 0
+    _subtitle_conversion_state['failed_count'] = 0
+    _subtitle_conversion_state['percent'] = 0
+
+    success = 0
+    failed = 0
+    for i, (srt_path, vtt_path) in enumerate(_srt_to_convert, 1):
+        _subtitle_conversion_state['current_index'] = i
+        _subtitle_conversion_state['current_file'] = srt_path.name
+        _subtitle_conversion_state['percent'] = 0
+
+        logger.info(f"[{i}/{len(_srt_to_convert)}] Converting: {srt_path.name}")
+        if convert_srt_to_vtt(srt_path):
+            success += 1
+            _subtitle_conversion_state['done_count'] = success
+            _subtitle_conversion_state['percent'] = 100
+        else:
+            failed += 1
+            _subtitle_conversion_state['failed_count'] = failed
+
+    _subtitle_conversion_state['phase'] = 'done'
+    _srt_to_convert = []
+    logger.info(f"Subtitle conversion complete: {success} OK, {failed} failed")
+
+
 class RangeHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     """HTTP handler with Range request support for video seeking."""
 
@@ -595,6 +753,10 @@ class VideoPlayerHandler(RangeHTTPRequestHandler):
             self.send_json(_conversion_state)
             return
 
+        if path == '/api/subtitle-conversion-status':
+            self.send_json(_subtitle_conversion_state)
+            return
+
         # Serve index.html for root
         if path == '/' or path == '/index.html':
             self.serve_static_file('web/index.html', 'text/html')
@@ -639,6 +801,10 @@ class VideoPlayerHandler(RangeHTTPRequestHandler):
 
         if path == '/api/convert':
             self.handle_start_conversion()
+            return
+
+        if path == '/api/convert-subtitles':
+            self.handle_start_subtitle_conversion()
             return
 
         self.send_error(404, "Not found")
@@ -709,6 +875,17 @@ class VideoPlayerHandler(RangeHTTPRequestHandler):
 
         # Start conversion in a background thread
         t = threading.Thread(target=run_conversion, daemon=True)
+        t.start()
+        self.send_json({'success': True})
+
+    def handle_start_subtitle_conversion(self):
+        """Start converting SRT subtitles to VTT (triggered by user from frontend dialog)."""
+        if _subtitle_conversion_state['phase'] != 'waiting':
+            self.send_json({'success': False, 'error': 'Not in waiting state'})
+            return
+
+        # Start conversion in a background thread
+        t = threading.Thread(target=run_subtitle_conversion, daemon=True)
         t.start()
         self.send_json({'success': True})
 
@@ -965,6 +1142,14 @@ def main():
         daemon=True
     )
     scan_thread.start()
+
+    # Scan for SRT files without VTT in background thread
+    subtitle_scan_thread = threading.Thread(
+        target=scan_subtitles_on_startup,
+        args=(course_path,),
+        daemon=True
+    )
+    subtitle_scan_thread.start()
 
     try:
         with ThreadedHTTPServer(("", port), VideoPlayerHandler) as httpd:
